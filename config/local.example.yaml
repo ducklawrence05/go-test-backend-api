@@ -1,0 +1,26 @@
+server:
+  port: 8080
+  mode: "dev"
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  username: "your_username"
+  password: "your_password"
+  dbname: testdevgo
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+logger:
+  log_level: debug
+  file_log_name: "./storages/logs/dev.xxx.log"
+  max_size: 500
+  max_backups: 3
+  max_age: 28
+  compress: true
+jwt:
+  key:
+    access_token: "your_access_token_secret"
+    refresh_token: "your_refresh_token_secret"
+  expires:
+    access_token: 900
+    refresh_token: 604800
