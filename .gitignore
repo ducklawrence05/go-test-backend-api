@@ -38,7 +38,7 @@ go.work.sum
 /config/local.yaml
 
 # Generated wire files
-/internal/wire/**/wire_gen.go
+/internal/infrastructure/wire/**/wire_gen.go
 
 # Air/TOML temp
 .air.toml

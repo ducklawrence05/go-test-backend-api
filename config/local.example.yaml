@@ -18,9 +18,7 @@ logger:
   max_age: 28
   compress: true
 jwt:
-  key:
-    access_token: "your_access_token_secret"
-    refresh_token: "your_refresh_token_secret"
-  expires:
-    access_token: 900
-    refresh_token: 604800
+  access_token_key: ""
+  access_token_expires_in:
+  refresh_token_key: ""
+  refresh_token_expires_in:

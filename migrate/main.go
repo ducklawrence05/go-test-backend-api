@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ducklawrence05/go-test-backend-api/internal/initialize"
+	"github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/initialization"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -17,7 +17,7 @@ func main() {
 		log.Fatal("Usage: migrate [up|down|step n]")
 	}
 
-	cfg, err := initialize.LoadConfig()
+	cfg, err := initialization.LoadConfig()
 	if err != nil {
 		log.Fatalf("cannot load config: %v", err)
 	}
