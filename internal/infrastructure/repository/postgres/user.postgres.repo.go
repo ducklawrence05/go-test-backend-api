@@ -1,49 +1,56 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/ducklawrence05/go-test-backend-api/internal/entities"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/repository"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type userPostgres struct {
+type userPgRepo struct {
 	db *gorm.DB
 }
 
 func NewUserRepo(db *gorm.DB) repository.UserRepository {
-	return &userPostgres{db: db}
+	return &userPgRepo{db: db}
 }
 
-func (pg *userPostgres) GetByID(id uuid.UUID) (*entities.User, error) {
+func (r *userPgRepo) GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
 	var user entities.User
-	err := pg.db.Preload("Role").First(&user, "id = ?", id).Error
+	err := r.db.WithContext(ctx).
+		Preload("Role").
+		First(&user, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (pg *userPostgres) GetByUsername(userName string) (*entities.User, error) {
+func (r *userPgRepo) GetByUsername(ctx context.Context, userName string) (*entities.User, error) {
 	var user entities.User
-	err := pg.db.Preload("Role").First(&user, "user_name = ?", userName).Error
+	err := r.db.WithContext(ctx).
+		Preload("Role").
+		First(&user, "user_name = ?", userName).Error
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (pg *userPostgres) Create(user *entities.User) error {
-	err := pg.db.Create(user).Error
+func (r *userPgRepo) Create(ctx context.Context, user *entities.User) error {
+	err := r.db.WithContext(ctx).Create(user).Error
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (pg *userPostgres) IsUserNameTaken(userName string, excludeUserID uuid.UUID) (bool, error) {
+func (r *userPgRepo) IsUserNameTaken(ctx context.Context, userName string, excludeUserID uuid.UUID) (bool, error) {
 	var count int64
-	err := pg.db.Model(&entities.User{}).
+	err := r.db.WithContext(ctx).
+		Model(&entities.User{}).
 		Where("user_name = ? AND id != ?", userName, excludeUserID).
 		Count(&count).Error
 	if err != nil {
@@ -52,8 +59,10 @@ func (pg *userPostgres) IsUserNameTaken(userName string, excludeUserID uuid.UUID
 	return count > 0, nil
 }
 
-func (pg *userPostgres) Update(user *entities.User, fields map[string]any) error {
-	err := pg.db.Model(&user).Updates(fields).Error
+func (r *userPgRepo) Update(ctx context.Context, user *entities.User, fields map[string]any) error {
+	err := r.db.WithContext(ctx).
+		Model(&user).
+		Updates(fields).Error
 	if err != nil {
 		return err
 	}
@@ -61,8 +70,10 @@ func (pg *userPostgres) Update(user *entities.User, fields map[string]any) error
 }
 
 // hard delete
-func (pg *userPostgres) DeleteByID(userID uuid.UUID) error {
-	err := pg.db.Where("id = ?", userID).Delete(&entities.User{}).Error
+func (r *userPgRepo) DeleteByID(ctx context.Context, userID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Where("id = ?", userID).
+		Delete(&entities.User{}).Error
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/internal/delivery/payload"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
 
-	"github.com/ducklawrence05/go-test-backend-api/pkg/mapper"
+	"github.com/ducklawrence05/go-test-backend-api/internal/delivery/mapper"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,7 +38,9 @@ func (uh *UserHandler) Register(c *gin.Context) {
 		Password:  payload.Password,
 	}
 
-	if err := uh.userService.Register(vo); err != nil {
+	ctx := c.Request.Context()
+
+	if err := uh.userService.Register(ctx, vo); err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
 	}
@@ -60,7 +62,9 @@ func (uh *UserHandler) Login(c *gin.Context) {
 		Password: payload.Password,
 	}
 
-	accessToken, refreshToken, err := uh.userService.Login(vo)
+	ctx := c.Request.Context()
+
+	accessToken, refreshToken, err := uh.userService.Login(ctx, vo)
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
@@ -96,7 +100,9 @@ func (uh *UserHandler) Logout(c *gin.Context) {
 		RefreshToken: payload.RefreshToken,
 	}
 
-	err := uh.userService.Logout(vo)
+	ctx := c.Request.Context()
+
+	err := uh.userService.Logout(ctx, vo)
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
@@ -113,7 +119,9 @@ func (uh *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	user, err := uh.userService.GetMe(userID.(uuid.UUID))
+	ctx := c.Request.Context()
+
+	user, err := uh.userService.GetMe(ctx, userID.(uuid.UUID))
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
@@ -145,7 +153,9 @@ func (uh *UserHandler) UpdateMe(c *gin.Context) {
 		LastName:  payload.LastName,
 	}
 
-	user, err := uh.userService.UpdateMe(vo)
+	ctx := c.Request.Context()
+
+	user, err := uh.userService.UpdateMe(ctx, vo)
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
@@ -176,7 +186,9 @@ func (uh *UserHandler) ChangePassword(c *gin.Context) {
 		NewPassword: payload.NewPassword,
 	}
 
-	if err := uh.userService.ChangePassword(vo); err != nil {
+	ctx := c.Request.Context()
+
+	if err := uh.userService.ChangePassword(ctx, vo); err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
 	}
@@ -192,7 +204,9 @@ func (uh *UserHandler) DeleteMe(c *gin.Context) {
 		return
 	}
 
-	err := uh.userService.DeleteMe(userID.(uuid.UUID))
+	ctx := c.Request.Context()
+
+	err := uh.userService.DeleteMe(ctx, userID.(uuid.UUID))
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
@@ -210,7 +224,9 @@ func (uh *UserHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, err := uh.userService.RefreshToken(payload.RefreshToken)
+	ctx := c.Request.Context()
+
+	accessToken, refreshToken, err := uh.userService.RefreshToken(ctx, payload.RefreshToken)
 	if err != nil {
 		c.JSON(err.StatusCode, gin.H{
 			"error": err.Msg,

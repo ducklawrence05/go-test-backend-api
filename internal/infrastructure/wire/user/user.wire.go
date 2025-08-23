@@ -17,6 +17,7 @@ func InitUserRouterHandler(config *setting.Config, db *gorm.DB) (*handler.UserHa
 		postgres.NewUserRepo,
 		postgres.NewRoleRepo,
 		postgres.NewRefreshTokenRepo,
+		postgres.NewUserServiceUow,
 		us.NewService,
 		handler.NewUserHandler,
 	)

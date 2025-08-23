@@ -22,5 +22,6 @@ func ToSnakeCase(s string) string {
 		}
 		result = append(result, unicode.ToLower(r))
 	}
+
 	return string(result)
 }

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ducklawrence05/go-test-backend-api/internal/entities"
@@ -9,33 +10,35 @@ import (
 	"gorm.io/gorm"
 )
 
-type rtPostgres struct {
+type refreshTokenPgRepo struct {
 	db *gorm.DB
 }
 
 func NewRefreshTokenRepo(db *gorm.DB) repository.RefreshTokenRepository {
-	return &rtPostgres{db: db}
+	return &refreshTokenPgRepo{db: db}
 }
 
-func (pgr *rtPostgres) GetByTokenAndUserID(token string, userID uuid.UUID) (*entities.RefreshToken, error) {
+func (r *refreshTokenPgRepo) GetByTokenAndUserID(ctx context.Context, token string, userID uuid.UUID) (*entities.RefreshToken, error) {
 	var refreshToken entities.RefreshToken
-	err := pgr.db.Where("user_id = ? AND token = ? AND revoked = false", userID, token).First(&refreshToken).Error
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND token = ? AND revoked = false", userID, token).
+		First(&refreshToken).Error
 	if err != nil {
 		return nil, err
 	}
 	return &refreshToken, nil
 }
 
-func (pgr *rtPostgres) Create(refreshToken *entities.RefreshToken) error {
-	err := pgr.db.Create(refreshToken).Error
+func (r *refreshTokenPgRepo) Create(ctx context.Context, refreshToken *entities.RefreshToken) error {
+	err := r.db.WithContext(ctx).Create(refreshToken).Error
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (pgr *rtPostgres) Revoke(userID uuid.UUID, token string) error {
-	result := pgr.db.Model(&entities.RefreshToken{}).
+func (r *refreshTokenPgRepo) Revoke(ctx context.Context, token string, userID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Model(&entities.RefreshToken{}).
 		Where("user_id = ? AND token = ? AND revoked = false", userID, token).
 		Update("revoked", true)
 
@@ -50,8 +53,10 @@ func (pgr *rtPostgres) Revoke(userID uuid.UUID, token string) error {
 	return nil
 }
 
-func (pgr *rtPostgres) DeleteByUserID(userID uuid.UUID) error {
-	err := pgr.db.Where("user_id = ?", userID).Delete(&entities.RefreshToken{}).Error
+func (r *refreshTokenPgRepo) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&entities.RefreshToken{}).Error
 	if err != nil {
 		return err
 	}
