@@ -6,8 +6,8 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/internal/delivery/payload"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
 
+	"github.com/ducklawrence05/go-test-backend-api/pkg/mapper"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils"
-	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/mapper"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
