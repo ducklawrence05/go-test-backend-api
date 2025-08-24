@@ -30,7 +30,7 @@ func (r *refreshTokenPgRepo) GetByTokenAndUserID(ctx context.Context, token stri
 }
 
 func (r *refreshTokenPgRepo) Create(ctx context.Context, refreshToken *entities.RefreshToken) error {
-	err := r.db.WithContext(ctx).Create(refreshToken).Error
+	err := r.db.WithContext(ctx).Create(&refreshToken).Error
 	if err != nil {
 		return err
 	}

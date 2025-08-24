@@ -54,51 +54,57 @@ func NewService(
 }
 
 func (us *userService) Register(ctx context.Context, vo CreateUserVO) (string, string, *utils.MyError) {
+	g, gCtx := errgroup.WithContext(ctx)
+
+	drChan := make(chan *entities.Role, 1)
+	hpChan := make(chan string, 1)
+
+	// check if user exists
+	g.Go(func() error {
+		exists, err := us.userRepo.IsUserNameTaken(gCtx, vo.UserName, uuid.Nil)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return &utils.MyError{
+				Msg:        "this username is already exists",
+				StatusCode: http.StatusBadRequest,
+			}
+		}
+		return nil
+	})
+
+	// get default role
+	g.Go(func() error {
+		dr, err := us.roleRepo.GetByName(gCtx, "user")
+		if err != nil {
+			return err
+		}
+		drChan <- dr
+		return nil
+	})
+
+	// hash pass
+	g.Go(func() error {
+		hp, err := utils.HashPassword(vo.Password)
+		if err != nil {
+			return err
+		}
+		hpChan <- hp
+		return nil
+	})
+
+	if myErr := utils.WaitErrGroup(g); myErr != nil {
+		return "", "", myErr
+	}
+
+	defaultRole := <-drChan
+	hashedPassword := <-hpChan
+
 	var accessToken, refreshToken string
 
+	// begin transaction
 	myErr := us.uow.Do(ctx, func(r uow.UserServiceRepoProvider) *utils.MyError {
-		var defaultRole *entities.Role
-
-		g, ctx := errgroup.WithContext(ctx)
-
-		// check if user exists
-		g.Go(func() error {
-			exists, err := r.UserRepository().IsUserNameTaken(ctx, vo.UserName, uuid.Nil)
-			if err != nil {
-				return err
-			}
-			if exists {
-				return &utils.MyError{
-					Msg:        "this username is already exists",
-					StatusCode: http.StatusBadRequest,
-				}
-			}
-			return nil
-		})
-
-		// get default role
-		g.Go(func() error {
-			var err error
-			defaultRole, err = r.RoleRepository().GetByName(ctx, "user")
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-
-		if myErr := utils.WaitErrGroup(g); myErr != nil {
-			return myErr
-		}
-
-		// hash pass
-		hashedPassword, err := utils.HashPassword(vo.Password)
-		if err != nil {
-			return &utils.MyError{
-				Msg:        err.Error(),
-				StatusCode: http.StatusInternalServerError,
-			}
-		}
-
 		// create use
 		user := &entities.User{
 			ID:        uuid.New(),
@@ -111,7 +117,16 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) (string, s
 			RoleID:    defaultRole.ID,
 		}
 
+		// insert user into db
+		if err := r.UserRepository().Create(ctx, user); err != nil {
+			return &utils.MyError{
+				Msg:        err.Error(),
+				StatusCode: http.StatusInternalServerError,
+			}
+		}
+
 		// gene ac and rt
+		var err error
 		accessToken, refreshToken, err = utils.GenerateAcAndRtTokens(us.config, user.ID)
 		if err != nil {
 			return &utils.MyError{
@@ -129,34 +144,19 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) (string, s
 			}
 		}
 
-		// insert user into db
-		g.Go(func() error {
-			err = r.UserRepository().Create(ctx, user)
-			if err != nil {
-				return err
+		if err := r.RefreshTokenRepository().Create(ctx, &entities.RefreshToken{
+			ID:        uuid.New(),
+			UserID:    user.ID,
+			Token:     refreshToken,
+			IssuedAt:  claims.IssuedAt.Time,
+			ExpiresAt: claims.ExpiresAt.Time,
+			CreatedAt: time.Now(),
+			Revoked:   false,
+		}); err != nil {
+			return &utils.MyError{
+				Msg:        err.Error(),
+				StatusCode: http.StatusInternalServerError,
 			}
-			return nil
-		})
-
-		// insert rt to into db
-		g.Go(func() error {
-			err = r.RefreshTokenRepository().Create(ctx, &entities.RefreshToken{
-				ID:        uuid.New(),
-				UserID:    user.ID,
-				Token:     refreshToken,
-				IssuedAt:  claims.IssuedAt.Time,
-				ExpiresAt: claims.ExpiresAt.Time,
-				CreatedAt: time.Now(),
-				Revoked:   false,
-			})
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-
-		if myErr := utils.WaitErrGroup(g); myErr != nil {
-			return myErr
 		}
 
 		// commit
@@ -291,7 +291,7 @@ func (us *userService) UpdateMe(ctx context.Context, vo UpdateMeVO) (*entities.U
 
 	// check username unique
 	if vo.UserName != "" {
-		taken, err := us.userRepo.IsUserNameTaken(ctx, vo.UserName, user.ID)
+		taken, err := us.userRepo.IsUserNameTaken(ctx, vo.UserName, vo.UserID)
 		if err != nil {
 			return nil, &utils.MyError{
 				Msg:        err.Error(),
@@ -301,7 +301,7 @@ func (us *userService) UpdateMe(ctx context.Context, vo UpdateMeVO) (*entities.U
 		if taken {
 			return nil, &utils.MyError{
 				Msg:        "username already taken",
-				StatusCode: http.StatusUnprocessableEntity,
+				StatusCode: http.StatusBadRequest,
 			}
 		}
 		user.UserName = vo.UserName
@@ -316,7 +316,7 @@ func (us *userService) UpdateMe(ctx context.Context, vo UpdateMeVO) (*entities.U
 	}
 
 	// update
-	if err = us.userRepo.Update(ctx, user, map[string]any{
+	if err := us.userRepo.Update(ctx, user, map[string]any{
 		"user_name":  user.UserName,
 		"first_name": user.FirstName,
 		"last_name":  user.LastName,
@@ -346,26 +346,38 @@ func (us *userService) ChangePassword(ctx context.Context, vo ChangePasswordVO) 
 		}
 	}
 
+	g, _ := errgroup.WithContext(ctx)
+
+	hpChan := make(chan string, 1)
+
 	// check old password
-	if !utils.ComparePasswords(user.Password, []byte(vo.OldPassword)) {
-		return &utils.MyError{
-			Msg:        "invalid password",
-			StatusCode: http.StatusBadRequest,
+	g.Go(func() error {
+		if !utils.ComparePasswords(user.Password, []byte(vo.OldPassword)) {
+			return &utils.MyError{
+				Msg:        "invalid password",
+				StatusCode: http.StatusBadRequest,
+			}
 		}
-	}
+		return nil
+	})
 
 	// hash password
-	hashedPassword, err := utils.HashPassword(vo.NewPassword)
-	if err != nil {
-		return &utils.MyError{
-			Msg:        err.Error(),
-			StatusCode: http.StatusInternalServerError,
+	g.Go(func() error {
+		hp, err := utils.HashPassword(vo.NewPassword)
+		if err != nil {
+			return err
 		}
+		hpChan <- hp
+		return nil
+	})
+
+	if myErr := utils.WaitErrGroup(g); myErr != nil {
+		return myErr
 	}
 
 	// change password
 	if err := us.userRepo.Update(ctx, user, map[string]any{
-		"password": hashedPassword,
+		"password": <-hpChan,
 	}); err != nil {
 		return &utils.MyError{
 			Msg:        err.Error(),
@@ -377,7 +389,7 @@ func (us *userService) ChangePassword(ctx context.Context, vo ChangePasswordVO) 
 }
 
 func (us *userService) DeleteMe(ctx context.Context, userID uuid.UUID) *utils.MyError {
-	return us.uow.Do(ctx, func(r uow.UserServiceRepoProvider) *utils.MyError {
+	myErr := us.uow.Do(ctx, func(r uow.UserServiceRepoProvider) *utils.MyError {
 		// check user exists
 		if _, err := r.UserRepository().GetByID(ctx, userID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -410,6 +422,8 @@ func (us *userService) DeleteMe(ctx context.Context, userID uuid.UUID) *utils.My
 
 		return nil
 	})
+
+	return myErr
 }
 
 func (us *userService) RefreshToken(ctx context.Context, refreshToken string) (string, string, *utils.MyError) {

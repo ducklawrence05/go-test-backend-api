@@ -21,7 +21,11 @@ func NewUserServiceUow(db *gorm.DB) uow.UserServiceUow {
 func (d *userServicePgUow) Do(ctx context.Context, fn func(r uow.UserServiceRepoProvider) *utils.MyError) *utils.MyError {
 	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		repoProvider := &repoProvider{tx: tx}
-		return fn(repoProvider)
+		myErr := fn(repoProvider)
+		if myErr != nil {
+			return myErr
+		}
+		return nil
 	})
 
 	if err != nil {

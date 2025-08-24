@@ -18,7 +18,9 @@ func InitPostgres(pgCfg setting.PostgresSetting, logger *logger.LoggerZap) *gorm
 		pgCfg.Host, pgCfg.Username, pgCfg.Password, pgCfg.Dbname, pgCfg.Port,
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		SkipDefaultTransaction: true,
+	})
 	if err != nil {
 		logger.Fatal("InitPostgres initialization error", zap.Error(err))
 	}

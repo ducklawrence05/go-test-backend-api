@@ -40,7 +40,7 @@ func (r *userPgRepo) GetByUsername(ctx context.Context, userName string) (*entit
 }
 
 func (r *userPgRepo) Create(ctx context.Context, user *entities.User) error {
-	err := r.db.WithContext(ctx).Create(user).Error
+	err := r.db.WithContext(ctx).Create(&user).Error
 	if err != nil {
 		return err
 	}
@@ -74,6 +74,7 @@ func (r *userPgRepo) DeleteByID(ctx context.Context, userID uuid.UUID) error {
 	err := r.db.WithContext(ctx).
 		Where("id = ?", userID).
 		Delete(&entities.User{}).Error
+
 	if err != nil {
 		return err
 	}
