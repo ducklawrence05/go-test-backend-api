@@ -2,15 +2,6 @@ package utils
 
 import "unicode"
 
-type MyError struct {
-	Msg        string
-	StatusCode int
-}
-
-func (e MyError) Error() string {
-	return e.Msg
-}
-
 func ToSnakeCase(s string) string {
 	if s == "" {
 		return s

@@ -40,12 +40,19 @@ func (uh *UserHandler) Register(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	if err := uh.userService.Register(ctx, vo); err != nil {
+	accessToken, refreshToken, err := uh.userService.Register(ctx, vo)
+	if err != nil {
 		c.JSON(err.StatusCode, gin.H{"error": err.Msg})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "register success"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "register success",
+		"token": gin.H{
+			"access_token":  accessToken,
+			"refresh_token": refreshToken,
+		},
+	})
 }
 
 func (uh *UserHandler) Login(c *gin.Context) {

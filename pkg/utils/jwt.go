@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ducklawrence05/go-test-backend-api/pkg/setting"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
@@ -45,4 +46,19 @@ func ValidateToken(secret []byte, tokenString string) (*CustomClaims, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 	return claims, nil
+}
+
+// GenerateAcAndRtTokens concurrently creates access token and refresh token
+func GenerateAcAndRtTokens(config *setting.Config, userID uuid.UUID) (string, string, error) {
+	accessToken, err := CreateJWT([]byte(config.JWT.AccessTokenKey), userID, config.JWT.AccessTokenExpiresIn)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err := CreateJWT([]byte(config.JWT.RefreshTokenKey), userID, config.JWT.RefreshTokenExpiresIn)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
 }

@@ -18,7 +18,7 @@ import (
 
 // interface
 type Service interface {
-	Register(ctx context.Context, vo CreateUserVO) *utils.MyError
+	Register(ctx context.Context, vo CreateUserVO) (string, string, *utils.MyError)
 	Login(ctx context.Context, vo LoginUserVO) (string, string, *utils.MyError)
 	Logout(ctx context.Context, vo LogoutUserVO) *utils.MyError
 	GetMe(ctx context.Context, userID uuid.UUID) (*entities.User, *utils.MyError)
@@ -53,12 +53,11 @@ func NewService(
 	}
 }
 
-func (us *userService) Register(ctx context.Context, vo CreateUserVO) *utils.MyError {
-	return us.uow.Do(ctx, func(r uow.UserServiceRepoProvider) *utils.MyError {
-		var (
-			hashedPassword string
-			defaultRole    *entities.Role
-		)
+func (us *userService) Register(ctx context.Context, vo CreateUserVO) (string, string, *utils.MyError) {
+	var accessToken, refreshToken string
+
+	myErr := us.uow.Do(ctx, func(r uow.UserServiceRepoProvider) *utils.MyError {
+		var defaultRole *entities.Role
 
 		g, ctx := errgroup.WithContext(ctx)
 
@@ -77,16 +76,6 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) *utils.MyE
 			return nil
 		})
 
-		// hash pass
-		g.Go(func() error {
-			var err error
-			hashedPassword, err = utils.HashPassword(vo.Password)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-
 		// get default role
 		g.Go(func() error {
 			var err error
@@ -97,12 +86,21 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) *utils.MyE
 			return nil
 		})
 
-		if myErr := waitErrGroup(g); myErr != nil {
+		if myErr := utils.WaitErrGroup(g); myErr != nil {
 			return myErr
 		}
 
-		// create new user
-		err := r.UserRepository().Create(ctx, &entities.User{
+		// hash pass
+		hashedPassword, err := utils.HashPassword(vo.Password)
+		if err != nil {
+			return &utils.MyError{
+				Msg:        err.Error(),
+				StatusCode: http.StatusInternalServerError,
+			}
+		}
+
+		// create use
+		user := &entities.User{
 			ID:        uuid.New(),
 			UserName:  vo.UserName,
 			FirstName: vo.FirstName,
@@ -111,7 +109,10 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) *utils.MyE
 			IsActive:  true,
 			CreatedAt: time.Now(),
 			RoleID:    defaultRole.ID,
-		})
+		}
+
+		// gene ac and rt
+		accessToken, refreshToken, err = utils.GenerateAcAndRtTokens(us.config, user.ID)
 		if err != nil {
 			return &utils.MyError{
 				Msg:        err.Error(),
@@ -119,9 +120,53 @@ func (us *userService) Register(ctx context.Context, vo CreateUserVO) *utils.MyE
 			}
 		}
 
+		// decode rt to get exp and iat
+		claims, err := utils.ValidateToken([]byte(us.config.JWT.RefreshTokenKey), refreshToken)
+		if err != nil {
+			return &utils.MyError{
+				Msg:        err.Error(),
+				StatusCode: http.StatusInternalServerError,
+			}
+		}
+
+		// insert user into db
+		g.Go(func() error {
+			err = r.UserRepository().Create(ctx, user)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+		// insert rt to into db
+		g.Go(func() error {
+			err = r.RefreshTokenRepository().Create(ctx, &entities.RefreshToken{
+				ID:        uuid.New(),
+				UserID:    user.ID,
+				Token:     refreshToken,
+				IssuedAt:  claims.IssuedAt.Time,
+				ExpiresAt: claims.ExpiresAt.Time,
+				CreatedAt: time.Now(),
+				Revoked:   false,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+		if myErr := utils.WaitErrGroup(g); myErr != nil {
+			return myErr
+		}
+
 		// commit
 		return nil
 	})
+
+	if myErr != nil {
+		return "", "", myErr
+	}
+	return accessToken, refreshToken, nil
 }
 
 func (us *userService) Login(ctx context.Context, vo LoginUserVO) (string, string, *utils.MyError) {
@@ -135,9 +180,12 @@ func (us *userService) Login(ctx context.Context, vo LoginUserVO) (string, strin
 	}
 
 	// gene ac and rt
-	accessToken, refreshToken, myErr := generateAcAndRtTokens(us.config, user.ID)
-	if myErr != nil {
-		return "", "", myErr
+	accessToken, refreshToken, err := utils.GenerateAcAndRtTokens(us.config, user.ID)
+	if err != nil {
+		return "", "", &utils.MyError{
+			Msg:        err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
 	}
 
 	// decode rt to get exp and iat
@@ -387,10 +435,12 @@ func (us *userService) RefreshToken(ctx context.Context, refreshToken string) (s
 		}
 
 		// gene ac and rt
-		var myErr *utils.MyError
-		accessToken, newRefreshToken, myErr = generateAcAndRtTokens(us.config, claims.UserID)
-		if myErr != nil {
-			return myErr
+		accessToken, newRefreshToken, err = utils.GenerateAcAndRtTokens(us.config, claims.UserID)
+		if err != nil {
+			return &utils.MyError{
+				Msg:        err.Error(),
+				StatusCode: http.StatusInternalServerError,
+			}
 		}
 
 		// decode rt to get exp and iat
@@ -438,68 +488,4 @@ func (us *userService) RefreshToken(ctx context.Context, refreshToken string) (s
 		return "", "", myErr
 	}
 	return accessToken, newRefreshToken, nil
-}
-
-// helper
-func waitErrGroup(g *errgroup.Group) *utils.MyError {
-	if err := g.Wait(); err != nil {
-		if myErr, ok := err.(*utils.MyError); ok {
-			return myErr
-		}
-		return &utils.MyError{
-			Msg:        err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		}
-	}
-	return nil
-}
-
-// GenerateAcAndRtTokens concurrently creates access token and refresh token
-func generateAcAndRtTokens(config *setting.Config, userID uuid.UUID) (accessToken string, refreshToken string, myErr *utils.MyError) {
-	type tokenResult struct {
-		Token string
-		Err   error
-	}
-
-	acCh := make(chan tokenResult)
-	rtCh := make(chan tokenResult)
-
-	// generate access token
-	go func() {
-		at, err := utils.CreateJWT(
-			[]byte(config.JWT.AccessTokenKey),
-			userID,
-			config.JWT.AccessTokenExpiresIn,
-		)
-		acCh <- tokenResult{at, err}
-	}()
-
-	// generate refresh token
-	go func() {
-		rt, err := utils.CreateJWT(
-			[]byte(config.JWT.RefreshTokenKey),
-			userID,
-			config.JWT.RefreshTokenExpiresIn,
-		)
-		rtCh <- tokenResult{rt, err}
-	}()
-
-	// receive results
-	acRes := <-acCh
-	rtRes := <-rtCh
-
-	if acRes.Err != nil {
-		return "", "", &utils.MyError{
-			Msg:        acRes.Err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		}
-	}
-	if rtRes.Err != nil {
-		return "", "", &utils.MyError{
-			Msg:        rtRes.Err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		}
-	}
-
-	return acRes.Token, rtRes.Token, nil
 }
