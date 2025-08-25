@@ -13,5 +13,6 @@ type UserRepository interface {
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User, fields map[string]any) error
 	IsUserNameTaken(ctx context.Context, userName string, excludeUserID uuid.UUID) (bool, error)
+	IsEmailTaken(ctx context.Context, email string, excludeUserID uuid.UUID) (bool, error)
 	DeleteByID(ctx context.Context, userID uuid.UUID) error
 }

@@ -3,21 +3,28 @@ package logger
 import (
 	"os"
 
-	"github.com/ducklawrence05/go-test-backend-api/pkg/setting"
+	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// Interface
+type Interface interface {
+	Debug(msg string, fields ...zap.Field)
+	Info(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
+	Error(msg string, fields ...zap.Field)
+	Fatal(msg string, fields ...zap.Field)
+}
+
 type LoggerZap struct {
 	*zap.Logger
 }
 
-func NewLogger(config setting.LoggerSetting) *LoggerZap {
-	logLevel := config.Log_level
-
+func New(config config.Logger) Interface {
 	var level zapcore.Level
-	switch logLevel {
+	switch config.LogLevel {
 	case "debug":
 		level = zapcore.DebugLevel
 	case "info":
@@ -33,11 +40,11 @@ func NewLogger(config setting.LoggerSetting) *LoggerZap {
 	encoder := getEncoderLog()
 
 	hook := lumberjack.Logger{
-		Filename:   config.File_log_name, // "./storages/logs/dev.xxx.log"
-		MaxSize:    config.Max_size,      // megabytes
-		MaxBackups: config.Max_backups,   //
-		MaxAge:     config.Max_age,       //days
-		Compress:   config.Compress,      // disabled by default
+		Filename:   config.FileLogName, // "./storages/logs/dev.xxx.log"
+		MaxSize:    config.MaxSize,     // megabytes
+		MaxBackups: config.MaxBackups,  //
+		MaxAge:     config.MaxAge,      //days
+		Compress:   config.Compress,    // disabled by default
 	}
 
 	core := zapcore.NewCore(

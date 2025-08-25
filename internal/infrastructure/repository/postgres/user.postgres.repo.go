@@ -59,6 +59,18 @@ func (r *userPgRepo) IsUserNameTaken(ctx context.Context, userName string, exclu
 	return count > 0, nil
 }
 
+func (r *userPgRepo) IsEmailTaken(ctx context.Context, email string, excludeUserID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&entities.User{}).
+		Where("email = ? AND id != ?", email, excludeUserID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *userPgRepo) Update(ctx context.Context, user *entities.User, fields map[string]any) error {
 	err := r.db.WithContext(ctx).
 		Model(&user).

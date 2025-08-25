@@ -5,7 +5,7 @@ BINARY_NAME=main
 
 .PHONY: build
 build:
-	@go build -o ./bin/$(BINARY_NAME).exe cmd/server/main.go
+	@go build -o ./bin/$(BINARY_NAME).exe cmd/app/main.go
  
 .PHONY: run
 run: build

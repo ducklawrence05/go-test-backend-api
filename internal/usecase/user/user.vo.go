@@ -3,6 +3,7 @@ package user
 import "github.com/google/uuid"
 
 type CreateUserVO struct {
+	Email     string
 	UserName  string
 	FirstName string
 	LastName  string
@@ -10,8 +11,8 @@ type CreateUserVO struct {
 }
 
 type LoginUserVO struct {
-	UserName string
-	Password string
+	EmailOrUsername string
+	Password        string
 }
 
 type LogoutUserVO struct {

@@ -3,23 +3,41 @@
 package user
 
 import (
-	"github.com/ducklawrence05/go-test-backend-api/internal/delivery/handler"
+	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/repository/postgres"
-	us "github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
-	"github.com/ducklawrence05/go-test-backend-api/pkg/setting"
+	rdRepo "github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/repository/redis"
+	userInterface "github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
+	userImpl "github.com/ducklawrence05/go-test-backend-api/internal/usecase/user/implement"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
 
-func InitUserRouterHandler(config *setting.Config, db *gorm.DB) (*handler.UserHandler, error) {
+func InitUserAuthManager(
+	config *config.Config,
+	db *gorm.DB,
+	rdb *redis.Client,
+) userInterface.UserAuthManager {
 	wire.Build(
+		rdRepo.NewOtpRepo,
 		postgres.NewUserRepo,
 		postgres.NewRoleRepo,
 		postgres.NewRefreshTokenRepo,
-		postgres.NewUserServiceUow,
-		us.NewService,
-		handler.NewUserHandler,
+		postgres.NewUserManagerUow,
+		userImpl.NewUserAuthManager,
 	)
-	return new(handler.UserHandler), nil
+	return nil
+}
+
+func InitUserProfileManager(
+	config *config.Config,
+	db *gorm.DB,
+) userInterface.UserProfileManager {
+	wire.Build(
+		postgres.NewUserRepo,
+		postgres.NewUserManagerUow,
+		userImpl.NewUserProfileManager,
+	)
+	return nil
 }
