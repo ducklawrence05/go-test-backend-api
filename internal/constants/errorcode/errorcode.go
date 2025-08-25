@@ -12,12 +12,14 @@ var (
 	ErrInvalidEmail    = errors.New("this email is already exists")
 	ErrInvalidUserName = errors.New("this username is already exists")
 	ErrInvalidPassword = errors.New("invalid password")
+	ErrInvalidOTP      = errors.New("invalid otp")
 
 	// 401
 	ErrInvalidToken = errors.New("invalid token")
 
 	// 404
 	ErrUserNotFound = errors.New("user not found")
+	ErrOTPNotFound  = errors.New("otp not found or expired")
 
 	// 500
 	ErrUnexpectedSigningToken = errors.New("unexpected signing token")
@@ -29,12 +31,14 @@ var errorStatusMap = map[error]int{
 	ErrInvalidEmail:    http.StatusBadRequest,
 	ErrInvalidUserName: http.StatusBadRequest,
 	ErrInvalidPassword: http.StatusBadRequest,
+	ErrInvalidOTP:      http.StatusBadRequest,
 
 	// 401
 	ErrInvalidToken: http.StatusUnauthorized,
 
 	// 404
 	ErrUserNotFound: http.StatusNotFound,
+	ErrOTPNotFound:  http.StatusNotFound,
 
 	// 500
 	ErrUnexpectedSigningToken: http.StatusInternalServerError,

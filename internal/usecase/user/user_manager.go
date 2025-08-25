@@ -9,7 +9,9 @@ import (
 
 type (
 	UserAuthManager interface {
-		Register(ctx context.Context, vo CreateUserVO) (string, string, error)
+		SendRegistrationOTP(ctx context.Context, email string) error
+		VerifyRegistrationOTP(ctx context.Context, email, otp string) (string, error)
+		CompleteRegistration(ctx context.Context, vo CreateUserVO) (string, string, error)
 		Login(ctx context.Context, vo LoginUserVO) (string, string, error)
 		Logout(ctx context.Context, vo LogoutUserVO) error
 		RefreshToken(ctx context.Context, refreshToken string) (string, string, error)

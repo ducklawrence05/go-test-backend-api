@@ -8,8 +8,6 @@ import (
 	"text/template"
 
 	"github.com/ducklawrence05/go-test-backend-api/config"
-	"github.com/ducklawrence05/go-test-backend-api/global"
-	"go.uber.org/zap"
 )
 
 type EmailAddress struct {
@@ -55,7 +53,6 @@ func SendTextEmailOtp(smtpCfg *config.SMTP, to []string, otp string) error {
 	)
 
 	if err != nil {
-		global.Logger.Error("Email send failed", zap.Error(err))
 		return err
 	}
 
@@ -105,7 +102,6 @@ func send(smtpCfg *config.SMTP, to []string, htmlTemplate string) error {
 	)
 
 	if err != nil {
-		global.Logger.Error("Email send failed", zap.Error(err))
 		return err
 	}
 

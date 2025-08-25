@@ -1,22 +1,34 @@
 package jwt
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ducklawrence05/go-test-backend-api/config"
-	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
+
+type AllowedClaims interface {
+	*UserClaims | *EmailClaims
+}
 
 type UserClaims struct {
 	UserID uuid.UUID `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
+func NewUserClaims() *UserClaims {
+	return &UserClaims{}
+}
+
 type EmailClaims struct {
 	Email string `json:"email"`
 	jwt.RegisteredClaims
+}
+
+func NewEmailClaims() *EmailClaims {
+	return &EmailClaims{}
 }
 
 func CreateJWT(secret []byte, claims jwt.Claims) (string, error) {
@@ -25,23 +37,25 @@ func CreateJWT(secret []byte, claims jwt.Claims) (string, error) {
 	return token.SignedString(secret)
 }
 
-func ValidateToken[T jwt.Claims](secret []byte, tokenString string) (*T, error) {
-	var claims T
+func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims func() T) (T, error) {
+	claims := newClaims()
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errorcode.ErrUnexpectedSigningToken
+			return nil, errors.New("unexpected signing method")
 		}
 		return secret, nil
 	})
 	if err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
 
-	claims, ok := token.Claims.(T)
-	if !ok || !token.Valid {
-		return nil, errorcode.ErrInvalidToken
+	if !token.Valid {
+		var zero T
+		return zero, errors.New("token invalid")
 	}
-	return &claims, nil
+
+	return claims, nil
 }
 
 // GenerateAcAndRtTokens concurrently creates access token and refresh token
@@ -71,4 +85,19 @@ func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, str
 	return accessToken, refreshToken, nil
 }
 
-
+func GenerateEmailVerifiedToken(config *config.Config, email string) (string, error) {
+	emailVerifyToken, err := CreateJWT(
+		[]byte(config.JWT.EmailVerifiedKey),
+		EmailClaims{
+			Email: email,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.EmailVerifiedTokenExpiresIn)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	return emailVerifyToken, nil
+}

@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
+	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
 
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/middleware"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/v1/controller"
@@ -30,15 +31,27 @@ func InitUserRouter(
 	// public
 	userRouterPublic := router.Group("/user")
 	{
-		userRouterPublic.POST("/register", userController.Register)
+		userRouterPublic.POST("/register",
+			middleware.AccessTokenMiddleware(
+				[]byte(urCfg.Config.JWT.EmailVerifiedKey), urCfg.Logger, jwt.NewEmailClaims,
+			),
+			userController.CompleteRegistration,
+		)
 		userRouterPublic.POST("/login", userController.Login)
 		userRouterPublic.POST("/refresh-token", userController.RefreshToken)
+	}
+
+	// email
+	userEmailRouter := userRouterPublic.Group("/email")
+	{
+		userEmailRouter.POST("/send-otp", userController.SendRegistrationOTP)
+		userEmailRouter.POST("/verify-otp", userController.VerifyRegistrationOTP)
 	}
 
 	// private
 	userRouterPrivate := router.Group("/user")
 	userRouterPrivate.Use(middleware.AccessTokenMiddleware(
-		[]byte(urCfg.Config.JWT.AccessTokenKey), urCfg.Logger))
+		[]byte(urCfg.Config.JWT.AccessTokenKey), urCfg.Logger, jwt.NewUserClaims))
 	{
 		userRouterPrivate.POST("/logout", userController.Logout)
 		userRouterPrivate.GET("/me", userController.GetMe)

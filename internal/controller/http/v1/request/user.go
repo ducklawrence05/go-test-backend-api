@@ -1,7 +1,15 @@
 package request
 
-type RegisterUserReq struct {
-	Email           string `json:"email" binding:"required,email"`
+type SendRegistrationOTPReq struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyRegistrationOTPReq struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required,len=6"`
+}
+
+type CreateUserReq struct {
 	UserName        string `json:"user_name" binding:"required"`
 	FirstName       string `json:"first_name" binding:"required"`
 	LastName        string `json:"last_name" binding:"required"`

@@ -2,6 +2,7 @@ package implement
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ducklawrence05/go-test-backend-api/config"
@@ -11,17 +12,22 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/repository"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/uow"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
+	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/otputils"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/password"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/sendto"
+	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/str"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
 // implement
 type userAuthManager struct {
 	config           *config.Config
+	logger           logger.Interface
 	uow              uow.UserManagerUow
 	otpRepo          repository.OTPRepository
 	userRepo         repository.UserRepository
@@ -31,6 +37,7 @@ type userAuthManager struct {
 
 func NewUserAuthManager(
 	config *config.Config,
+	logger logger.Interface,
 	uow uow.UserManagerUow,
 	otpRepo repository.OTPRepository,
 	userRepo repository.UserRepository,
@@ -40,6 +47,7 @@ func NewUserAuthManager(
 	return &userAuthManager{
 		config:           config,
 		uow:              uow,
+		logger:           logger,
 		otpRepo:          otpRepo,
 		userRepo:         userRepo,
 		roleRepo:         roleRepo,
@@ -47,7 +55,69 @@ func NewUserAuthManager(
 	}
 }
 
-func (m *userAuthManager) Register(ctx context.Context, vo user.CreateUserVO) (string, string, error) {
+func (m *userAuthManager) SendRegistrationOTP(ctx context.Context, email string) error {
+	// check email exists
+	exists, err := m.userRepo.IsEmailTaken(ctx, email, uuid.Nil)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errorcode.ErrInvalidEmail
+	}
+
+	// gene otp
+	otp := otputils.GenerateSecureOTP()
+	// hash email
+	hashedEmail := str.HashString(email, []byte(m.config.OTP.EmailVerifyKey))
+	// save otp to redis
+	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.OTPEmailVerify,
+		m.config.OTP.EmailVerifyExpiresIn); err != nil {
+		return err
+	}
+
+	// send otp to email
+	go func() {
+		err := sendto.SendTemplateEmailOtp(&m.config.SMTP, []string{email},
+			"register-otp-verification.html", map[string]any{"otp": otp})
+		if err != nil {
+			m.logger.Error("Send email error", zap.Error(err))
+		}
+	}()
+
+	return nil
+}
+
+func (m *userAuthManager) VerifyRegistrationOTP(ctx context.Context, email, otp string) (string, error) {
+	// hash email
+	hashedEmail := str.HashString(email, []byte(m.config.OTP.EmailVerifyKey))
+
+	// check otp in redis
+	storedOtp, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.OTPEmailVerify)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", errorcode.ErrOTPNotFound
+		}
+		return "", err
+	}
+	if storedOtp != otp {
+		return "", errorcode.ErrInvalidOTP
+	}
+
+	// delete otp in redis
+	if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.OTPEmailVerify); err != nil {
+		m.logger.Warn("Cannot delete old otp from Redis", zap.Error(err))
+	}
+
+	// gene jwt token
+	token, err := jwt.GenerateEmailVerifiedToken(m.config, email)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (m *userAuthManager) CompleteRegistration(ctx context.Context, vo user.CreateUserVO) (string, string, error) {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	drChan := make(chan *entities.Role, 1)
@@ -65,7 +135,7 @@ func (m *userAuthManager) Register(ctx context.Context, vo user.CreateUserVO) (s
 		return nil
 	})
 
-	// check if email exists
+	// re-check if email exists
 	g.Go(func() error {
 		exists, err := m.userRepo.IsEmailTaken(gCtx, vo.Email, uuid.Nil)
 		if err != nil {
@@ -104,41 +174,22 @@ func (m *userAuthManager) Register(ctx context.Context, vo user.CreateUserVO) (s
 	// create use
 	userID := uuid.New()
 	user := &entities.User{
-		ID:         userID,
-		Email:      vo.Email,
-		UserName:   vo.UserName,
-		FirstName:  vo.FirstName,
-		LastName:   vo.LastName,
-		Password:   <-hpChan,
-		IsActive:   true,
-		IsVerified: false,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  nil,
-		DeletedAt:  nil,
+		ID:        userID,
+		Email:     vo.Email,
+		UserName:  vo.UserName,
+		FirstName: vo.FirstName,
+		LastName:  vo.LastName,
+		Password:  <-hpChan,
+		CreatedAt: time.Now(),
+		UpdatedAt: nil,
+		DeletedAt: nil,
 
 		RoleID: (<-drChan).ID,
 	}
 
-	// gene otp
-	otp := otputils.GenerateSecureOTP()
-	// save otp to redis
-	err := m.otpRepo.SetOTP(ctx, user.ID.String(), otp, otptype.OTPEmailVerify, m.config.OTP.EmailVerifyExpiresIn)
-	if err != nil {
-		return "", "", err
-	}
-
-	// send email with otp
-	err = sendto.SendTemplateEmailOtp(
-		&m.config.SMTP, []string{user.Email},
-		"register-otp-verification.html", map[string]any{"otp": otp},
-	)
-	if err != nil {
-		return "", "", err
-	}
-
 	var accessToken, refreshToken string
 	// begin transaction
-	err = m.uow.Do(ctx, func(r uow.UserManagerRepoProvider) error {
+	err := m.uow.Do(ctx, func(r uow.UserManagerRepoProvider) error {
 		// insert user into db
 		err := r.UserRepository().Create(ctx, user)
 		if err != nil {
@@ -152,7 +203,8 @@ func (m *userAuthManager) Register(ctx context.Context, vo user.CreateUserVO) (s
 		}
 
 		// decode rt to get exp and iat
-		claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey), refreshToken)
+		claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
+			refreshToken, jwt.NewUserClaims)
 		if err != nil {
 			return err
 		}
@@ -177,7 +229,6 @@ func (m *userAuthManager) Register(ctx context.Context, vo user.CreateUserVO) (s
 		return "", "", err
 	}
 	return accessToken, refreshToken, nil
-
 }
 
 func (m *userAuthManager) Login(ctx context.Context, vo user.LoginUserVO) (string, string, error) {
@@ -194,7 +245,8 @@ func (m *userAuthManager) Login(ctx context.Context, vo user.LoginUserVO) (strin
 	}
 
 	// decode rt to get exp and iat
-	claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey), refreshToken)
+	claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
+		refreshToken, jwt.NewUserClaims)
 	if err != nil {
 		return "", "", err
 	}
@@ -218,10 +270,11 @@ func (m *userAuthManager) Login(ctx context.Context, vo user.LoginUserVO) (strin
 
 func (m *userAuthManager) Logout(ctx context.Context, vo user.LogoutUserVO) error {
 	// decode rt
-	claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey), vo.RefreshToken)
-	if err != nil {
-		return err
-	}
+	// claims, err := jwt.ValidateToken[jwt.UserClaims]([]byte(m.config.JWT.RefreshTokenKey), vo.RefreshToken)
+	// if err != nil {
+	// 	return err
+	// }
+	claims := &jwt.UserClaims{}
 
 	// compare userID from ac and rt
 	if claims.UserID != vo.UserID {
@@ -229,12 +282,12 @@ func (m *userAuthManager) Logout(ctx context.Context, vo user.LogoutUserVO) erro
 	}
 
 	// check if revoked or not
-	if _, err = m.refreshTokenRepo.GetByTokenAndUserID(ctx, vo.RefreshToken, vo.UserID); err != nil {
+	if _, err := m.refreshTokenRepo.GetByTokenAndUserID(ctx, vo.RefreshToken, vo.UserID); err != nil {
 		return errorcode.ErrInvalidToken
 	}
 
 	// revoke
-	err = m.refreshTokenRepo.Revoke(ctx, vo.RefreshToken, vo.UserID)
+	err := m.refreshTokenRepo.Revoke(ctx, vo.RefreshToken, vo.UserID)
 	if err != nil {
 		return err
 	}
@@ -246,10 +299,12 @@ func (m *userAuthManager) RefreshToken(ctx context.Context, refreshToken string)
 	var accessToken, newRefreshToken string
 	err := m.uow.Do(ctx, func(r uow.UserManagerRepoProvider) error {
 		// validate token
-		claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey), refreshToken)
-		if err != nil {
-			return errorcode.ErrInvalidToken
-		}
+		// claims, err := jwt.ValidateToken[jwt.UserClaims]([]byte(m.config.JWT.RefreshTokenKey), refreshToken)
+		// if err != nil {
+		// 	return errorcode.ErrInvalidToken
+		// }
+
+		claims := &jwt.UserClaims{}
 
 		// check token in db
 		if _, err := r.RefreshTokenRepository().GetByTokenAndUserID(
@@ -259,19 +314,18 @@ func (m *userAuthManager) RefreshToken(ctx context.Context, refreshToken string)
 		}
 
 		// gene ac and rt
+		var err error
 		accessToken, newRefreshToken, err = jwt.GenerateAcAndRtTokens(m.config, claims.UserID)
 		if err != nil {
 			return err
 		}
 
 		// decode rt to get exp and iat
-		newClaims, err := jwt.ValidateToken(
-			[]byte(m.config.JWT.RefreshTokenKey),
-			newRefreshToken,
-		)
-		if err != nil {
-			return err
-		}
+		// newClaims, err := jwt.ValidateToken[jwt.UserClaims]([]byte(m.config.JWT.RefreshTokenKey), newRefreshToken)
+		// if err != nil {
+		// 	return err
+		// }
+		newClaims := &jwt.UserClaims{}
 
 		// insert rt to into db
 		err = r.RefreshTokenRepository().Create(ctx, &entities.RefreshToken{

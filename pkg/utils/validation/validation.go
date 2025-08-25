@@ -41,6 +41,8 @@ func TranslateValidationError(err error) string {
 				msg = fmt.Sprintf("%s must be equal to %s", fieldName, paramName)
 			case "nefield":
 				msg = fmt.Sprintf("%s must be different from %s", fieldName, paramName)
+			case "len":
+				msg = fmt.Sprintf("%s must be exactly %s characters long", fieldName, paramName)
 			default:
 				msg = fmt.Sprintf("%s: %s", fieldName, fe.Tag())
 			}

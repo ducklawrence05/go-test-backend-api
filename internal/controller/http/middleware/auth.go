@@ -1,16 +1,18 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
-	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
+	jwtutils "github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"go.uber.org/zap"
 )
 
-func AccessTokenMiddleware(secret []byte, logger logger.Interface) gin.HandlerFunc {
+func AccessTokenMiddleware[T jwt.Claims](secret []byte, logger logger.Interface, newClaims func() T) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// get token from header
 		authHeader := c.GetHeader("Authorization")
@@ -26,17 +28,28 @@ func AccessTokenMiddleware(secret []byte, logger logger.Interface) gin.HandlerFu
 			permissionDenied(c)
 			return
 		}
-		accessToken := strings.TrimPrefix(authHeader, "Bearer ")
+		token := strings.TrimPrefix(authHeader, "Bearer ")
 
+		fmt.Println("sfdsfsfd", token)
 		// validate token
-		claims, err := jwt.ValidateToken(secret, accessToken)
+		claims, err := jwtutils.ValidateToken(secret, token, newClaims)
 		if err != nil {
-			logger.Warn("failed to validate access token", zap.Error(err))
+			logger.Warn("failed to validate token", zap.Error(err))
 			permissionDenied(c)
 			return
 		}
 
-		c.Set("userID", claims.UserID)
+		switch v := any(claims).(type) {
+		case *jwtutils.UserClaims:
+			c.Set("userID", v.UserID)
+		case *jwtutils.EmailClaims:
+			c.Set("email", v.Email)
+		default:
+			logger.Warn("unknown claims type")
+			permissionDenied(c)
+			return
+		}
+
 		c.Next()
 	}
 }

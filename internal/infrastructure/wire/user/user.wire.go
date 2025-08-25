@@ -8,6 +8,7 @@ import (
 	rdRepo "github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/repository/redis"
 	userInterface "github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
 	userImpl "github.com/ducklawrence05/go-test-backend-api/internal/usecase/user/implement"
+	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/google/wire"
@@ -18,6 +19,7 @@ func InitUserAuthManager(
 	config *config.Config,
 	db *gorm.DB,
 	rdb *redis.Client,
+	l logger.Interface,
 ) userInterface.UserAuthManager {
 	wire.Build(
 		rdRepo.NewOtpRepo,

@@ -7,19 +7,15 @@ import (
 )
 
 type User struct {
-	ID         uuid.UUID  `gorm:"column:id;type:uuid;primaryKey"`
-	Email      string     `gorm:"column:email;type:varchar(255)"`
-	UserName   string     `gorm:"column:user_name;type:varchar(255)"`
-	FirstName  string     `gorm:"column:first_name;type:varchar(255)"`
-	LastName   string     `gorm:"column:last_name;type:varchar(255)"`
-	Password   string     `gorm:"column:password;type:varchar(255)"`
-	IsActive   bool       `gorm:"column:is_active"`
-	IsVerified bool       `gorm:"column:is_verified"`
-	CreatedAt  time.Time  `gorm:"column:created_at"`
-	UpdatedAt  *time.Time `gorm:"column:updated_at"`
-	DeletedAt  *time.Time `gorm:"column:deleted_at"`
-	// EmailVerifyToken    *string    `gorm:"column:email_verify_token;type:varchar(255)"`
-	// ForgotPasswordToken *string    `gorm:"column:forgot_password_token;type:varchar(255)"`
+	ID        uuid.UUID  `gorm:"column:id;type:uuid;primaryKey"`
+	Email     string     `gorm:"column:email;type:varchar(255)"`
+	UserName  string     `gorm:"column:user_name;type:varchar(255)"`
+	FirstName string     `gorm:"column:first_name;type:varchar(255)"`
+	LastName  string     `gorm:"column:last_name;type:varchar(255)"`
+	Password  string     `gorm:"column:password;type:varchar(255)"`
+	CreatedAt time.Time  `gorm:"column:created_at"`
+	UpdatedAt *time.Time `gorm:"column:updated_at"`
+	DeletedAt *time.Time `gorm:"column:deleted_at"`
 
 	RoleID uint `gorm:"column:role_id;type:int"`
 	Role   Role `gorm:"foreignKey:RoleID"`

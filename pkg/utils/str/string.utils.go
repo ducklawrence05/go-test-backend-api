@@ -1,6 +1,11 @@
 package str
 
-import "unicode"
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"unicode"
+)
 
 func ToSnakeCase(s string) string {
 	if s == "" {
@@ -15,4 +20,10 @@ func ToSnakeCase(s string) string {
 	}
 
 	return string(result)
+}
+
+func HashString(str string, secret []byte) string {
+	h := hmac.New(sha256.New, secret)
+	h.Write([]byte(str))
+	return hex.EncodeToString(h.Sum(nil))
 }

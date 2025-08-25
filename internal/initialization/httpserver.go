@@ -2,6 +2,7 @@ package initialization
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,7 +33,7 @@ func NewServer(port int, handler http.Handler) *http.Server {
 
 func RunServer(server *http.Server, logger logger.Interface) {
 	go func() {
-		logger.Info("Listening and serving HTTP on", zap.String("port", server.Addr))
+		fmt.Println("Listening and serving HTTP on", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Error ListenAndServe():", zap.Error(err))
 		}
@@ -42,7 +43,7 @@ func RunServer(server *http.Server, logger logger.Interface) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info("Shutting down server...")
+	fmt.Println("Shutting down server...")
 
 	// context to grateful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), defaultShutdownTimeout)
@@ -51,5 +52,5 @@ func RunServer(server *http.Server, logger logger.Interface) {
 		logger.Fatal("Server forced to shutdown:", zap.Error(err))
 	}
 
-	logger.Info("Server exited properly")
+	fmt.Println("Server exited properly")
 }

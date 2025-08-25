@@ -53,11 +53,13 @@ type Logger struct {
 }
 
 type JWT struct {
-	AccessTokenKey  string `mapstructure:"access_token_key"`
-	RefreshTokenKey string `mapstructure:"refresh_token_key"`
+	AccessTokenKey   string `mapstructure:"access_token_key"`
+	RefreshTokenKey  string `mapstructure:"refresh_token_key"`
+	EmailVerifiedKey string `mapstructure:"email_verified_token_key"`
 
-	AccessTokenExpiresIn  time.Duration `mapstructure:"access_token_expires_in"`
-	RefreshTokenExpiresIn time.Duration `mapstructure:"refresh_token_expires_in"`
+	AccessTokenExpiresIn        time.Duration `mapstructure:"access_token_expires_in"`
+	RefreshTokenExpiresIn       time.Duration `mapstructure:"refresh_token_expires_in"`
+	EmailVerifiedTokenExpiresIn time.Duration `mapstructure:"email_verified_token_expires_in"`
 }
 
 type OTP struct {
