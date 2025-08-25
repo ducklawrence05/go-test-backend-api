@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -30,7 +29,6 @@ func AccessTokenMiddleware[T jwt.Claims](secret []byte, logger logger.Interface,
 		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		fmt.Println("sfdsfsfd", token)
 		// validate token
 		claims, err := jwtutils.ValidateToken(secret, token, newClaims)
 		if err != nil {

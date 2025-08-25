@@ -1,17 +1,13 @@
 package jwt
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ducklawrence05/go-test-backend-api/config"
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
-
-type AllowedClaims interface {
-	*UserClaims | *EmailClaims
-}
 
 type UserClaims struct {
 	UserID uuid.UUID `json:"user_id"`
@@ -41,7 +37,7 @@ func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims fu
 	claims := newClaims()
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, errorcode.ErrUnexpectedSigningToken
 		}
 		return secret, nil
 	})
@@ -52,7 +48,7 @@ func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims fu
 
 	if !token.Valid {
 		var zero T
-		return zero, errors.New("token invalid")
+		return zero, errorcode.ErrInvalidToken
 	}
 
 	return claims, nil
