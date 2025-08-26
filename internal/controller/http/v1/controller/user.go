@@ -13,17 +13,20 @@ import (
 )
 
 type UserController struct {
-	auth    user.UserAuthManager
-	profile user.UserProfileManager
+	registration user.UserRegistrationManager
+	auth         user.UserAuthManager
+	profile      user.UserProfileManager
 }
 
 func NewUserController(
+	registration user.UserRegistrationManager,
 	auth user.UserAuthManager,
 	profile user.UserProfileManager,
 ) *UserController {
 	return &UserController{
-		auth:    auth,
-		profile: profile,
+		registration: registration,
+		auth:         auth,
+		profile:      profile,
 	}
 }
 
@@ -37,7 +40,7 @@ func (uc *UserController) SendRegistrationOTP(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	if err := uc.auth.SendRegistrationOTP(ctx, req.Email); err != nil {
+	if err := uc.registration.SendRegistrationOTP(ctx, req.Email); err != nil {
 		errorcode.JSONError(c, err)
 		return
 	}
@@ -57,7 +60,7 @@ func (uc *UserController) VerifyRegistrationOTP(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	emailVerifiedToken, err := uc.auth.VerifyRegistrationOTP(ctx, req.Email, req.OTP)
+	emailVerifiedToken, err := uc.registration.VerifyRegistrationOTP(ctx, req.Email, req.OTP)
 	if err != nil {
 		errorcode.JSONError(c, err)
 		return
@@ -92,7 +95,7 @@ func (uc *UserController) CompleteRegistration(c *gin.Context) {
 		Password:  req.Password,
 	}
 
-	accessToken, refreshToken, err := uc.auth.CompleteRegistration(ctx, vo)
+	accessToken, refreshToken, err := uc.registration.CompleteRegistration(ctx, vo)
 	if err != nil {
 		errorcode.JSONError(c, err)
 		return

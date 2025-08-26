@@ -15,7 +15,11 @@ var (
 	ErrInvalidOTP      = errors.New("invalid otp")
 
 	// 401
-	ErrInvalidToken = errors.New("invalid token")
+	ErrInvalidToken      = errors.New("invalid token")
+	ErrInvalidJWTPurpose = errors.New("invalid jwt purpose")
+
+	// 409
+	ErrEmailBelongsToDeletedAccount = errors.New("email belongs to deleted account")
 
 	// 404
 	ErrUserNotFound = errors.New("user not found")
@@ -34,11 +38,15 @@ var errorStatusMap = map[error]int{
 	ErrInvalidOTP:      http.StatusBadRequest,
 
 	// 401
-	ErrInvalidToken: http.StatusUnauthorized,
+	ErrInvalidToken:      http.StatusUnauthorized,
+	ErrInvalidJWTPurpose: http.StatusUnauthorized,
 
 	// 404
 	ErrUserNotFound: http.StatusNotFound,
 	ErrOTPNotFound:  http.StatusNotFound,
+
+	// 409
+	ErrEmailBelongsToDeletedAccount: http.StatusConflict,
 
 	// 500
 	ErrUnexpectedSigningToken: http.StatusInternalServerError,

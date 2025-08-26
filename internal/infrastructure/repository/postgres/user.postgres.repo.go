@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
 	"github.com/ducklawrence05/go-test-backend-api/internal/entities"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/repository"
 	"github.com/google/uuid"
@@ -21,18 +22,22 @@ func (r *userPgRepo) GetByID(ctx context.Context, id uuid.UUID) (*entities.User,
 	var user entities.User
 	err := r.db.WithContext(ctx).
 		Preload("Role").
-		First(&user, "id = ?", id).Error
+		Where("id = ?", id).
+		Where("is_active = ?", true).
+		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (r *userPgRepo) GetByUsername(ctx context.Context, userName string) (*entities.User, error) {
+func (r *userPgRepo) GetActiveByIdentity(ctx context.Context, identity string) (*entities.User, error) {
 	var user entities.User
 	err := r.db.WithContext(ctx).
 		Preload("Role").
-		First(&user, "user_name = ?", userName).Error
+		Where("user_name = ? OR email = ?", identity, identity).
+		Where("is_active = ?", true).
+		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +54,7 @@ func (r *userPgRepo) Create(ctx context.Context, user *entities.User) error {
 
 func (r *userPgRepo) IsUserNameTaken(ctx context.Context, userName string, excludeUserID uuid.UUID) (bool, error) {
 	var count int64
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Unscoped().
 		Model(&entities.User{}).
 		Where("user_name = ? AND id != ?", userName, excludeUserID).
 		Count(&count).Error
@@ -60,15 +65,19 @@ func (r *userPgRepo) IsUserNameTaken(ctx context.Context, userName string, exclu
 }
 
 func (r *userPgRepo) IsEmailTaken(ctx context.Context, email string, excludeUserID uuid.UUID) (bool, error) {
-	var count int64
-	err := r.db.WithContext(ctx).
-		Model(&entities.User{}).
+	var user *entities.User
+	err := r.db.WithContext(ctx).Unscoped().
 		Where("email = ? AND id != ?", email, excludeUserID).
-		Count(&count).Error
+		First(&user).Error
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+
+	if user.DeletedAt.Valid {
+		return true, errorcode.ErrEmailBelongsToDeletedAccount
+	}
+
+	return true, nil
 }
 
 func (r *userPgRepo) Update(ctx context.Context, user *entities.User, fields map[string]any) error {

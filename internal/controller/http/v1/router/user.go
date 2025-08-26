@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
-	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
 
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/jwtpurpose"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/middleware"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/v1/controller"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
@@ -23,18 +23,18 @@ type UserRouterConfig struct {
 func InitUserRouter(
 	router *gin.RouterGroup,
 	urCfg *UserRouterConfig,
+	registrationManager user.UserRegistrationManager,
 	authManager user.UserAuthManager,
 	profileManager user.UserProfileManager,
 ) {
-	userController := controller.NewUserController(authManager, profileManager)
+	userController := controller.NewUserController(registrationManager, authManager, profileManager)
 
 	// public
 	userRouterPublic := router.Group("/user")
 	{
 		userRouterPublic.POST("/register",
 			middleware.AccessTokenMiddleware(
-				[]byte(urCfg.Config.JWT.EmailVerifiedKey), urCfg.Logger, jwt.NewEmailClaims,
-			),
+				[]byte(urCfg.Config.JWT.RefreshTokenKey), urCfg.Logger, jwtpurpose.JWTRegister),
 			userController.CompleteRegistration,
 		)
 		userRouterPublic.POST("/login", userController.Login)
@@ -51,7 +51,7 @@ func InitUserRouter(
 	// private
 	userRouterPrivate := router.Group("/user")
 	userRouterPrivate.Use(middleware.AccessTokenMiddleware(
-		[]byte(urCfg.Config.JWT.AccessTokenKey), urCfg.Logger, jwt.NewUserClaims))
+		[]byte(urCfg.Config.JWT.AccessTokenKey), urCfg.Logger, jwtpurpose.JWTAccess))
 	{
 		userRouterPrivate.POST("/logout", userController.Logout)
 		userRouterPrivate.GET("/me", userController.GetMe)

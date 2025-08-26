@@ -53,18 +53,23 @@ type Logger struct {
 }
 
 type JWT struct {
-	AccessTokenKey   string `mapstructure:"access_token_key"`
-	RefreshTokenKey  string `mapstructure:"refresh_token_key"`
-	EmailVerifiedKey string `mapstructure:"email_verified_token_key"`
+	AccessTokenKey         string `mapstructure:"access_token_key"`
+	RefreshTokenKey        string `mapstructure:"refresh_token_key"`
+	RegisterTokenKey       string `mapstructure:"register_token_key"`
+	RestoreAccountTokenKey string `mapstructure:"restore_account_token_key"`
 
-	AccessTokenExpiresIn        time.Duration `mapstructure:"access_token_expires_in"`
-	RefreshTokenExpiresIn       time.Duration `mapstructure:"refresh_token_expires_in"`
-	EmailVerifiedTokenExpiresIn time.Duration `mapstructure:"email_verified_token_expires_in"`
+	AccessTokenExpiresIn         time.Duration `mapstructure:"access_token_expires_in"`
+	RefreshTokenExpiresIn        time.Duration `mapstructure:"refresh_token_expires_in"`
+	RegisterTokenExpiresIn       time.Duration `mapstructure:"register_token_expires_in"`
+	RestoreAccountTokenExpiresIn time.Duration `mapstructure:"restore_account_token_expires_in"`
 }
 
 type OTP struct {
-	EmailVerifyKey       string        `mapstructure:"email_verify_key"`
-	EmailVerifyExpiresIn time.Duration `mapstructure:"email_verify_expires_in"`
+	RegisterKey       string `mapstructure:"register_key"`
+	RestoreAccountKey string `mapstructure:"restore_account_key"`
+
+	RegisterExpiresIn       time.Duration `mapstructure:"register_expires_in"`
+	RestoreAccountExpiresIn time.Duration `mapstructure:"restore_account_expires_in"`
 }
 
 type SMTP struct {

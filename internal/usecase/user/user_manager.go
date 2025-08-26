@@ -8,10 +8,19 @@ import (
 )
 
 type (
-	UserAuthManager interface {
+	UserRegistrationManager interface {
 		SendRegistrationOTP(ctx context.Context, email string) error
 		VerifyRegistrationOTP(ctx context.Context, email, otp string) (string, error)
 		CompleteRegistration(ctx context.Context, vo CreateUserVO) (string, string, error)
+	}
+
+	UserRestoreManager interface {
+		SendRestoreOTP(ctx context.Context, email string) error
+		VerifyRestoreOTP(ctx context.Context, email, otp string) (string, error)
+		CompleteRestore(ctx context.Context, vo RestoreUserVO) (string, string, error)
+	}
+
+	UserAuthManager interface {
 		Login(ctx context.Context, vo LoginUserVO) (string, string, error)
 		Logout(ctx context.Context, vo LogoutUserVO) error
 		RefreshToken(ctx context.Context, refreshToken string) (string, string, error)

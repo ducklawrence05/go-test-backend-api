@@ -4,14 +4,15 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/jwtpurpose"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
 	jwtutils "github.com/ducklawrence05/go-test-backend-api/pkg/utils/jwt"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-func AccessTokenMiddleware[T jwt.Claims](secret []byte, logger logger.Interface, newClaims func() T) gin.HandlerFunc {
+func AccessTokenMiddleware(secret []byte, logger logger.Interface, purpose jwtpurpose.JWTPurpose) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// get token from header
 		authHeader := c.GetHeader("Authorization")
@@ -30,22 +31,24 @@ func AccessTokenMiddleware[T jwt.Claims](secret []byte, logger logger.Interface,
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// validate token
-		claims, err := jwtutils.ValidateToken(secret, token, newClaims)
+		claims, err := jwtutils.ValidateToken(secret, token, purpose)
 		if err != nil {
 			logger.Warn("failed to validate token", zap.Error(err))
 			permissionDenied(c)
 			return
 		}
 
-		switch v := any(claims).(type) {
-		case *jwtutils.UserClaims:
-			c.Set("userID", v.UserID)
-		case *jwtutils.EmailClaims:
-			c.Set("email", v.Email)
-		default:
-			logger.Warn("unknown claims type")
-			permissionDenied(c)
-			return
+		switch claims.Purpose {
+		case jwtpurpose.JWTAccess, jwtpurpose.JWTRefresh:
+			userID, err := uuid.Parse(claims.Subject)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "error when parsing claims subject to uuid",
+				})
+			}
+			c.Set("userID", userID)
+		case jwtpurpose.JWTRegister, jwtpurpose.JWTRestore:
+			c.Set("email", claims.Subject)
 		}
 
 		c.Next()

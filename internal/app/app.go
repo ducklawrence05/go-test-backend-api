@@ -22,7 +22,8 @@ func Run(cfg *config.Config) {
 	logger.Info("Initializing Redis successfully")
 
 	// usecase
-	userAuthManager := user.InitUserAuthManager(cfg, pgDb, rdb, logger)
+	userRegistrationManager := user.InitUserRegistrationManager(cfg, pgDb, rdb, logger)
+	userAuthManager := user.InitUserAuthManager(cfg, pgDb)
 	userProfileManager := user.InitUserProfileManager(cfg, pgDb)
 
 	// router
@@ -33,7 +34,7 @@ func Run(cfg *config.Config) {
 		Logger: logger,
 	}
 
-	router := http.InitRouter(routerCfg, userAuthManager, userProfileManager)
+	router := http.InitRouter(routerCfg, userRegistrationManager, userAuthManager, userProfileManager)
 
 	server := initialization.NewServer(cfg.HTTP.Port, router)
 	initialization.RunServer(server, logger)

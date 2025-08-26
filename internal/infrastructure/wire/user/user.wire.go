@@ -18,16 +18,29 @@ import (
 func InitUserAuthManager(
 	config *config.Config,
 	db *gorm.DB,
+) userInterface.UserAuthManager {
+	wire.Build(
+		postgres.NewUserRepo,
+		postgres.NewRefreshTokenRepo,
+		postgres.NewUserManagerUow,
+		userImpl.NewUserAuthManager,
+	)
+	return nil
+}
+
+func InitUserRegistrationManager(
+	config *config.Config,
+	db *gorm.DB,
 	rdb *redis.Client,
 	l logger.Interface,
-) userInterface.UserAuthManager {
+) userInterface.UserRegistrationManager {
 	wire.Build(
 		rdRepo.NewOtpRepo,
 		postgres.NewUserRepo,
 		postgres.NewRoleRepo,
 		postgres.NewRefreshTokenRepo,
 		postgres.NewUserManagerUow,
-		userImpl.NewUserAuthManager,
+		userImpl.NewUserRegistrationManager,
 	)
 	return nil
 }

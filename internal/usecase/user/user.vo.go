@@ -10,6 +10,10 @@ type CreateUserVO struct {
 	Password  string
 }
 
+type RestoreUserVO struct {
+	NewPassword string
+}
+
 type LoginUserVO struct {
 	EmailOrUsername string
 	Password        string

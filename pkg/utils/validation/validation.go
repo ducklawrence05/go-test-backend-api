@@ -3,23 +3,32 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/str"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 )
 
-// Check field is not equal to another field
+var emailRegex = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
+func NotEmail(fl validator.FieldLevel) bool {
+	return !emailRegex.MatchString(fl.Field().String())
+}
+
 func NotEqualField(fl validator.FieldLevel) bool {
 	field := fl.Field().String()
 	other := fl.Parent().FieldByName(fl.Param()).String()
 	return field != other
 }
 
-var Validate = validator.New()
-
 func init() {
-	Validate.RegisterValidation("neqfield", NotEqualField)
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		// đăng ký trên Gin's validator
+		v.RegisterValidation("nemail", NotEmail)
+		v.RegisterValidation("neqfield", NotEqualField)
+	}
 }
 
 func TranslateValidationError(err error) string {
@@ -33,16 +42,20 @@ func TranslateValidationError(err error) string {
 			switch fe.Tag() {
 			case "required":
 				msg = fmt.Sprintf("%s is required", fieldName)
-			case "min":
-				msg = fmt.Sprintf("%s must be at least %s characters", fieldName, paramName)
-			case "max":
-				msg = fmt.Sprintf("%s must be at most %s characters", fieldName, paramName)
+			case "email":
+				msg = fmt.Sprintf("%s must be an email", fieldName)
+			case "nemail":
+				msg = fmt.Sprintf("%s must not be an email", fieldName)
 			case "eqfield":
 				msg = fmt.Sprintf("%s must be equal to %s", fieldName, paramName)
 			case "nefield":
 				msg = fmt.Sprintf("%s must be different from %s", fieldName, paramName)
 			case "len":
 				msg = fmt.Sprintf("%s must be exactly %s characters long", fieldName, paramName)
+			case "min":
+				msg = fmt.Sprintf("%s must be at least %s characters", fieldName, paramName)
+			case "max":
+				msg = fmt.Sprintf("%s must be at most %s characters", fieldName, paramName)
 			default:
 				msg = fmt.Sprintf("%s: %s", fieldName, fe.Tag())
 			}

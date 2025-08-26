@@ -5,36 +5,24 @@ import (
 
 	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/jwtpurpose"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
 
-type UserClaims struct {
-	UserID uuid.UUID `json:"user_id"`
+type CustomClaims struct {
+	Purpose jwtpurpose.JWTPurpose `json:"purpose"`
 	jwt.RegisteredClaims
 }
 
-func NewUserClaims() *UserClaims {
-	return &UserClaims{}
-}
-
-type EmailClaims struct {
-	Email string `json:"email"`
-	jwt.RegisteredClaims
-}
-
-func NewEmailClaims() *EmailClaims {
-	return &EmailClaims{}
-}
-
-func CreateJWT(secret []byte, claims jwt.Claims) (string, error) {
+func createJWT(secret []byte, claims jwt.Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString(secret)
 }
 
-func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims func() T) (T, error) {
-	claims := newClaims()
+func ValidateToken(secret []byte, tokenString string, purpose jwtpurpose.JWTPurpose) (*CustomClaims, error) {
+	claims := &CustomClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errorcode.ErrUnexpectedSigningToken
@@ -42,13 +30,15 @@ func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims fu
 		return secret, nil
 	})
 	if err != nil {
-		var zero T
-		return zero, err
+		return nil, err
 	}
 
 	if !token.Valid {
-		var zero T
-		return zero, errorcode.ErrInvalidToken
+		return nil, errorcode.ErrInvalidToken
+	}
+
+	if claims.Purpose != purpose {
+		return nil, errorcode.ErrInvalidJWTPurpose
 	}
 
 	return claims, nil
@@ -56,9 +46,10 @@ func ValidateToken[T jwt.Claims](secret []byte, tokenString string, newClaims fu
 
 // GenerateAcAndRtTokens concurrently creates access token and refresh token
 func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, string, error) {
-	accessToken, err := CreateJWT([]byte(config.JWT.AccessTokenKey), UserClaims{
-		UserID: userID,
+	accessToken, err := createJWT([]byte(config.JWT.AccessTokenKey), CustomClaims{
+		Purpose: jwtpurpose.JWTAccess,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.AccessTokenExpiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -67,9 +58,10 @@ func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, str
 		return "", "", err
 	}
 
-	refreshToken, err := CreateJWT([]byte(config.JWT.RefreshTokenKey), UserClaims{
-		UserID: userID,
+	refreshToken, err := createJWT([]byte(config.JWT.RefreshTokenKey), CustomClaims{
+		Purpose: jwtpurpose.JWTRefresh,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.RefreshTokenExpiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -81,13 +73,17 @@ func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, str
 	return accessToken, refreshToken, nil
 }
 
-func GenerateEmailVerifiedToken(config *config.Config, email string) (string, error) {
-	emailVerifyToken, err := CreateJWT(
-		[]byte(config.JWT.EmailVerifiedKey),
-		EmailClaims{
-			Email: email,
+func GenerateEmailToken(
+	config *config.Config, email string,
+	secret []byte, expiresIn time.Duration, purpose jwtpurpose.JWTPurpose,
+) (string, error) {
+	emailVerifyToken, err := createJWT(
+		secret,
+		CustomClaims{
+			Purpose: purpose,
 			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.EmailVerifiedTokenExpiresIn)),
+				Subject:   email,
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 		},

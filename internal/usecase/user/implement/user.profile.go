@@ -150,7 +150,7 @@ func (m *userProfileManager) DeleteMe(ctx context.Context, userID uuid.UUID) err
 			return err
 		}
 
-		// hard delete user
+		// soft delete user
 		if err := r.UserRepository().DeleteByID(ctx, userID); err != nil {
 			return err
 		}

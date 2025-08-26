@@ -19,6 +19,7 @@ type RouterConfig struct {
 
 func InitRouter(
 	routerCfg *RouterConfig,
+	uRegistration user.UserRegistrationManager,
 	uAuth user.UserAuthManager,
 	uProfile user.UserProfileManager,
 ) *gin.Engine {
@@ -42,7 +43,7 @@ func InitRouter(
 				Rdb:    routerCfg.Rdb,
 				Logger: routerCfg.Logger,
 			},
-			uAuth, uProfile,
+			uRegistration, uAuth, uProfile,
 		)
 	}
 
