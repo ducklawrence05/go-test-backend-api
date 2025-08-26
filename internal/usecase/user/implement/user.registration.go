@@ -21,10 +21,8 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/sendto"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/str"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/gorm"
 )
 
 type userRegistrationManager struct {
@@ -57,7 +55,7 @@ func NewUserRegistrationManager(
 func (m *userRegistrationManager) SendRegistrationOTP(ctx context.Context, email string) error {
 	// check email exists
 	exists, err := m.userRepo.IsEmailTaken(ctx, email, uuid.Nil)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, errorcode.ErrUserNotFound) {
 		return err
 	}
 	if exists {
@@ -70,7 +68,7 @@ func (m *userRegistrationManager) SendRegistrationOTP(ctx context.Context, email
 	hashedEmail := str.HashString(email, []byte(m.config.OTP.RegisterKey))
 	// save otp to redis
 	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.Register,
-		m.config.OTP.RegisterExpiresIn); err != nil {
+		m.config.OTP.RegisterTTL); err != nil {
 		return err
 	}
 
@@ -93,9 +91,6 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	// check otp in redis
 	storedOtp, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.Register)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return "", errorcode.ErrOTPNotFound
-		}
 		return "", err
 	}
 	if storedOtp != otp {
@@ -139,7 +134,7 @@ func (m *userRegistrationManager) Register(ctx context.Context, vo user.CreateUs
 	// re-check if email exists
 	g.Go(func() error {
 		exists, err := m.userRepo.IsEmailTaken(gCtx, vo.Email, uuid.Nil)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err != nil && !errors.Is(err, errorcode.ErrUserNotFound) {
 			return err
 		}
 		if exists {

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func ValidateToken(secret []byte, purpose jwtpurpose.JWTPurpose, logger logger.Interface) gin.HandlerFunc {
+func ValidateToken(logger logger.Interface, secret []byte, purpose jwtpurpose.JWTPurpose) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// get token from header
 		authHeader := c.GetHeader("Authorization")

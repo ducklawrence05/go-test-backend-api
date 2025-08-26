@@ -20,7 +20,6 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/sendto"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/utils/str"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -60,7 +59,7 @@ func (m *userRestoreManager) SendRestoreOTP(ctx context.Context, email string) e
 	hashedEmail := str.HashString(email, []byte(m.config.OTP.RestoreAccountKey))
 	// save otp to redis
 	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.RestoreAccount,
-		m.config.OTP.RestoreAccountExpiresIn); err != nil {
+		m.config.OTP.RestoreAccountTTL); err != nil {
 		return err
 	}
 
@@ -83,9 +82,6 @@ func (m *userRestoreManager) VerifyRestoreOTP(ctx context.Context, email string,
 	// check otp in redis
 	storedOtp, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.RestoreAccount)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return "", errorcode.ErrOTPNotFound
-		}
 		return "", err
 	}
 	if storedOtp != otp {

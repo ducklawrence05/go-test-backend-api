@@ -4,6 +4,7 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/v1/router"
+	otpWire "github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/wire/otp"
 	roleWire "github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/wire/role"
 	userWire "github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/wire/user"
 	"github.com/ducklawrence05/go-test-backend-api/internal/initialization"
@@ -23,19 +24,17 @@ func Run(cfg *config.Config) {
 	rdb := initialization.InitRedis(&cfg.Redis, l)
 	l.Info("Initializing Redis successfully")
 
-	// usecase
+	// ===== usecase =====
+	// user
 	userRegistrationManager := userWire.InitUserRegistrationManager(cfg, pgDb, rdb, l)
 	userAuthManager := userWire.InitUserAuthManager(cfg, pgDb)
 	userRestoreManager := userWire.InitUserRestoreManager(cfg, pgDb, rdb, l)
 	userProfileManager := userWire.InitUserProfileManager(cfg, pgDb)
+	// role
 	roleManager := roleWire.InitRoleManager(pgDb)
-
-	userManagerSet := &router.UserManagerSet{
-		RegistrationManager: userRegistrationManager,
-		RestoreManager:      userRestoreManager,
-		AuthManager:         userAuthManager,
-		ProfileManager:      userProfileManager,
-	}
+	// otp
+	otpRateLimitManager := otpWire.InitOTPRateLimitManager(rdb)
+	otpVerifyManager := otpWire.InitOTPVerifyManager(rdb)
 
 	// init role cache
 	go initialization.InitRolesCache(roleManager, l)
@@ -46,6 +45,15 @@ func Run(cfg *config.Config) {
 		Db:     pgDb,
 		Rdb:    rdb,
 		Logger: l,
+	}
+
+	userManagerSet := &router.UserManagerSet{
+		RegistrationManager: userRegistrationManager,
+		RestoreManager:      userRestoreManager,
+		AuthManager:         userAuthManager,
+		ProfileManager:      userProfileManager,
+		OTPRateLimitManager: otpRateLimitManager,
+		OTPVerifyManager:    otpVerifyManager,
 	}
 
 	router := http.InitRouter(routerCfg, userManagerSet)

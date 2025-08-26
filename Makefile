@@ -1,6 +1,7 @@
 include .env
 export
 MIGRATIONS_PATH=./migrate/migrations
+WIRE_PATH=./internal/infrastructure/wire
 BINARY_NAME=main
 
 .PHONY: build
@@ -30,3 +31,7 @@ migrate-down:
 .PHONY: migrate-step
 migrate-step:
 	@go run migrate/main.go step $(filter-out $@,$(MAKECMDGOALS))
+
+.PHONY: wire
+wire:
+	@wire $(if $(filter-out $@,$(MAKECMDGOALS)),$(WIRE_PATH)/$(filter-out $@,$(MAKECMDGOALS)),$(WIRE_PATH)/...)

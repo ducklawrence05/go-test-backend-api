@@ -10,8 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var ctx = context.Background()
-
 func InitRedis(rCfg *config.Redis, logger logger.Interface) *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%v", rCfg.Host, rCfg.Port),
@@ -19,6 +17,8 @@ func InitRedis(rCfg *config.Redis, logger logger.Interface) *redis.Client {
 		DB:       rCfg.Database, // use default DB
 		PoolSize: 10,
 	})
+
+	ctx := context.Background()
 
 	_, err := rdb.Ping(ctx).Result()
 	if err != nil {

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
 	"github.com/ducklawrence05/go-test-backend-api/internal/entities"
@@ -78,6 +79,9 @@ func (r *userPgRepo) IsEmailTaken(ctx context.Context, email string, excludeUser
 		Where("email = ? AND id != ?", email, excludeUserID).
 		First(&user).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, errorcode.ErrUserNotFound
+		}
 		return false, err
 	}
 
@@ -98,7 +102,6 @@ func (r *userPgRepo) Update(ctx context.Context, user *entities.User, fields map
 	return nil
 }
 
-// hard delete
 func (r *userPgRepo) DeleteByID(ctx context.Context, userID uuid.UUID) error {
 	err := r.db.WithContext(ctx).
 		Where("id = ?", userID).

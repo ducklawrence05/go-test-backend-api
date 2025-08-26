@@ -53,23 +53,33 @@ type Logger struct {
 }
 
 type JWT struct {
-	AccessTokenKey         string `mapstructure:"access_token_key"`
-	RefreshTokenKey        string `mapstructure:"refresh_token_key"`
-	RegisterTokenKey       string `mapstructure:"register_token_key"`
-	RestoreAccountTokenKey string `mapstructure:"restore_account_token_key"`
+	AccessTokenKey       string        `mapstructure:"access_token_key"`
+	AccessTokenExpiresIn time.Duration `mapstructure:"access_token_expires_in"`
 
-	AccessTokenExpiresIn         time.Duration `mapstructure:"access_token_expires_in"`
-	RefreshTokenExpiresIn        time.Duration `mapstructure:"refresh_token_expires_in"`
-	RegisterTokenExpiresIn       time.Duration `mapstructure:"register_token_expires_in"`
+	RefreshTokenKey       string        `mapstructure:"refresh_token_key"`
+	RefreshTokenExpiresIn time.Duration `mapstructure:"refresh_token_expires_in"`
+
+	RegisterTokenKey       string        `mapstructure:"register_token_key"`
+	RegisterTokenExpiresIn time.Duration `mapstructure:"register_token_expires_in"`
+
+	RestoreAccountTokenKey       string        `mapstructure:"restore_account_token_key"`
 	RestoreAccountTokenExpiresIn time.Duration `mapstructure:"restore_account_token_expires_in"`
 }
 
 type OTP struct {
-	RegisterKey       string `mapstructure:"register_key"`
-	RestoreAccountKey string `mapstructure:"restore_account_key"`
+	RegisterKey          string        `mapstructure:"register_key"`
+	RegisterTTL          time.Duration `mapstructure:"register_ttl"`
+	RegisterRateLimit    int           `mapstructure:"register_rate_limit"`
+	RegisterRateLimitTTL time.Duration `mapstructure:"register_rate_limit_ttl"`
+	RegisterAttempts     int           `mapstructure:"register_attempts"`
+	RegisterAttemptsTTL  time.Duration `mapstructure:"register_attempts_ttl"`
 
-	RegisterExpiresIn       time.Duration `mapstructure:"register_expires_in"`
-	RestoreAccountExpiresIn time.Duration `mapstructure:"restore_account_expires_in"`
+	RestoreAccountKey          string        `mapstructure:"restore_account_key"`
+	RestoreAccountTTL          time.Duration `mapstructure:"restore_account_ttl"`
+	RestoreAccountRateLimit    int           `mapstructure:"restore_account_rate_limit"`
+	RestoreAccountRateLimitTTL time.Duration `mapstructure:"restore_account_rate_limit_ttl"`
+	RestoreAccountAttempts     int           `mapstructure:"restore_account_attempts"`
+	RestoreAccountAttemptsTTL  time.Duration `mapstructure:"restore_account_attempts_ttl"`
 }
 
 type SMTP struct {

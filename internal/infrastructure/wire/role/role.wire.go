@@ -5,7 +5,7 @@ package role
 import (
 	"github.com/ducklawrence05/go-test-backend-api/internal/infrastructure/repository/postgres"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/role"
-	roleImpl "github.com/ducklawrence05/go-test-backend-api/internal/usecase/role/impl"
+	roleImpl "github.com/ducklawrence05/go-test-backend-api/internal/usecase/role/implement"
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )

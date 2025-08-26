@@ -29,6 +29,10 @@ var (
 	// 409
 	ErrEmailBelongsToDeletedAccount = errors.New("email belongs to deleted account")
 
+	// 429
+	ErrOTPRateLimit       = errors.New("otp rate limit")
+	ErrOTPTooManyAttempts = errors.New("maximum otp attempts reached")
+
 	// 500
 	ErrUnexpectedSigningToken = errors.New("unexpected signing token")
 	ErrUnexpectedCreatingUser = errors.New("unexpected creating user")
@@ -56,6 +60,10 @@ var errorStatusMap = map[error]int{
 
 	// 409
 	ErrEmailBelongsToDeletedAccount: http.StatusConflict,
+
+	// 429
+	ErrOTPRateLimit:       http.StatusTooManyRequests,
+	ErrOTPTooManyAttempts: http.StatusTooManyRequests,
 
 	// 500
 	ErrUnexpectedSigningToken: http.StatusInternalServerError,
