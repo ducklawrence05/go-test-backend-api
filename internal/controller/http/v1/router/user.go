@@ -29,50 +29,50 @@ func InitUserRouter(
 	mSet *UserManagerSet,
 ) {
 	// Init controller
-	uProfileController := controller.NewUserProfileController(mSet.ProfileManager)
-	uRegistrationController := controller.NewUserRegistrationController(mSet.RegistrationManager)
-	uRestoreController := controller.NewUserRestoreController(mSet.RestoreManager)
-	uAuthController := controller.NewUserAuthController(mSet.AuthManager)
+	uProfileCtrl := controller.NewUserProfileController(mSet.ProfileManager)
+	uRegistrationCtrl := controller.NewUserRegistrationController(mSet.RegistrationManager)
+	uRestoreCtrl := controller.NewUserRestoreController(mSet.RestoreManager)
+	uAuthCtrl := controller.NewUserAuthController(mSet.AuthManager)
 
-	userRouter := router.Group("/user")
-
-	// --- Public routes ---
-	userRouter.POST("/login", uAuthController.Login)
-	userRouter.POST("/refresh-token", uAuthController.RefreshToken)
+	// ===== Public routes =====
+	public := router.Group("/user")
+	{
+		public.POST("/login", uAuthCtrl.Login)
+		public.POST("/refresh-token", uAuthCtrl.RefreshToken)
+	}
 
 	// Register route
-	registerRouter := userRouter.Group("/register")
+	register := public.Group("/register")
 	{
-		registerRouter.POST("/send-email-otp", uRegistrationController.SendRegistrationOTP)
-		registerRouter.POST("/verify-email-otp", uRegistrationController.VerifyRegistrationOTP)
-		registerRouter.POST("/completion",
-			middleware.ValidateToken(
-				[]byte(cfg.Config.JWT.RegisterTokenKey), cfg.Logger, jwtpurpose.Register),
-			uRegistrationController.Register,
+		register.POST("/send-email-otp", uRegistrationCtrl.SendRegistrationOTP)
+		register.POST("/verify-email-otp", uRegistrationCtrl.VerifyRegistrationOTP)
+		register.POST("/complete",
+			middleware.ValidateToken([]byte(cfg.Config.JWT.RegisterTokenKey), jwtpurpose.Register, cfg.Logger),
+			uRegistrationCtrl.Register,
 		)
 	}
 
 	// Restore
-	restoreRouter := userRouter.Group("/restore")
+	restore := public.Group("/restore")
 	{
-		restoreRouter.POST("/send-email-otp", uRestoreController.SendRestoreOTP)
-		restoreRouter.POST("/verify-email-otp", uRestoreController.VerifyRestoreOTP)
-		restoreRouter.POST("/completion",
-			middleware.ValidateToken(
-				[]byte(cfg.Config.JWT.RestoreAccountTokenKey), cfg.Logger, jwtpurpose.Restore),
-			uRestoreController.Restore,
+		restore.POST("/send-email-otp", uRestoreCtrl.SendRestoreOTP)
+		restore.POST("/verify-email-otp", uRestoreCtrl.VerifyRestoreOTP)
+		restore.POST("/complete",
+			middleware.ValidateToken([]byte(cfg.Config.JWT.RestoreAccountTokenKey), jwtpurpose.Restore, cfg.Logger),
+			uRestoreCtrl.Restore,
 		)
 	}
 
-	// --- Private routes (need access token) ---
-	userRouter.Use(
-		middleware.ValidateToken(
-			[]byte(cfg.Config.JWT.AccessTokenKey), cfg.Logger, jwtpurpose.Access),
-	)
-
-	userRouter.POST("/logout", uAuthController.Logout)
-	userRouter.GET("/me", uProfileController.GetMe)
-	userRouter.PATCH("/me", uProfileController.UpdateMe)
-	userRouter.PUT("/change-password", uProfileController.ChangePassword)
-	userRouter.DELETE("/me", uProfileController.DeleteMe)
+	// ===== Private routes (need access token) =====
+	private := router.Group("/user")
+	// middleware
+	private.Use(middleware.ValidateToken([]byte(cfg.Config.JWT.AccessTokenKey), jwtpurpose.Access, cfg.Logger))
+	// controller
+	{
+		private.POST("/logout", uAuthCtrl.Logout)
+		private.GET("/me", uProfileCtrl.GetMe)
+		private.PATCH("/me", uProfileCtrl.UpdateMe)
+		private.PUT("/change-password", uProfileCtrl.ChangePassword)
+		private.DELETE("/me", uProfileCtrl.DeleteMe)
+	}
 }

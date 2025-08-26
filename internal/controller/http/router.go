@@ -31,9 +31,10 @@ func InitRouter(
 		r = gin.New()
 	}
 
-	MainGroup := r.Group("/v1/go-test")
+	MainGroup := r.Group("/v1/")
 	{
-		router.InitUserRouter(MainGroup,
+		router.InitUserRouter(
+			MainGroup,
 			&router.UserRouterConfig{
 				Config: routerCfg.Config,
 				Logger: routerCfg.Logger,

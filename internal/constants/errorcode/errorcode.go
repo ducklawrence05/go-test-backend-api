@@ -19,15 +19,15 @@ var (
 	ErrInvalidJWTPurpose = errors.New("invalid jwt purpose")
 
 	// 403
-	ErrInactiveAccount = errors.New("your account is inactive")
-	ErrDeletedAccount  = errors.New("your account is deleted")
-
-	// 409
-	ErrEmailBelongsToDeletedAccount = errors.New("email belongs to deleted account, do you want to restore")
+	ErrInactiveAccount = errors.New("this account is inactive")
+	ErrDeletedAccount  = errors.New("this account is deleted")
 
 	// 404
 	ErrUserNotFound = errors.New("user not found")
 	ErrOTPNotFound  = errors.New("otp not found or expired")
+
+	// 409
+	ErrEmailBelongsToDeletedAccount = errors.New("email belongs to deleted account")
 
 	// 500
 	ErrUnexpectedSigningToken = errors.New("unexpected signing token")
