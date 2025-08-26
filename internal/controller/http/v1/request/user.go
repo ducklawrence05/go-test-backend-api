@@ -1,10 +1,10 @@
 package request
 
-type SendRegistrationOTPReq struct {
+type SendEmailOTPReq struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
-type VerifyRegistrationOTPReq struct {
+type VerifyEmailOTPReq struct {
 	Email string `json:"email" binding:"required,email"`
 	OTP   string `json:"otp" binding:"required,len=6"`
 }
@@ -40,4 +40,9 @@ type ChangePasswordReq struct {
 
 type RefreshTokenReq struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type RestoreUserReq struct {
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=30"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=NewPassword"`
 }

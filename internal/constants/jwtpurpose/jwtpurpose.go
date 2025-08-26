@@ -3,8 +3,8 @@ package jwtpurpose
 type JWTPurpose string
 
 const (
-	JWTAccess   JWTPurpose = "access"
-	JWTRefresh  JWTPurpose = "refresh"
-	JWTRegister JWTPurpose = "register"
-	JWTRestore  JWTPurpose = "restore"
+	Access   JWTPurpose = "access"
+	Refresh  JWTPurpose = "refresh"
+	Register JWTPurpose = "register"
+	Restore  JWTPurpose = "restore"
 )

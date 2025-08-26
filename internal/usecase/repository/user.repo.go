@@ -9,7 +9,7 @@ import (
 
 type UserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
-	GetActiveByIdentity(ctx context.Context, userName string) (*entities.User, error)
+	GetByUserNameOrEmail(ctx context.Context, identity string) (*entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User, fields map[string]any) error
 	IsUserNameTaken(ctx context.Context, userName string, excludeUserID uuid.UUID) (bool, error)

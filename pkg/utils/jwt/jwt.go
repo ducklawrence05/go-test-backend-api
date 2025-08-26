@@ -33,6 +33,7 @@ func ValidateToken(secret []byte, tokenString string, purpose jwtpurpose.JWTPurp
 		return nil, err
 	}
 
+	// check if exp
 	if !token.Valid {
 		return nil, errorcode.ErrInvalidToken
 	}
@@ -44,13 +45,13 @@ func ValidateToken(secret []byte, tokenString string, purpose jwtpurpose.JWTPurp
 	return claims, nil
 }
 
-// GenerateAcAndRtTokens concurrently creates access token and refresh token
-func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, string, error) {
-	accessToken, err := createJWT([]byte(config.JWT.AccessTokenKey), CustomClaims{
-		Purpose: jwtpurpose.JWTAccess,
+// GenerateAcAndRtTokens creates access token and refresh token
+func GenerateAcAndRtTokens(cfg *config.JWT, userID uuid.UUID) (string, string, error) {
+	accessToken, err := createJWT([]byte(cfg.AccessTokenKey), CustomClaims{
+		Purpose: jwtpurpose.Access,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.AccessTokenExpiresIn)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.AccessTokenExpiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	})
@@ -58,11 +59,11 @@ func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, str
 		return "", "", err
 	}
 
-	refreshToken, err := createJWT([]byte(config.JWT.RefreshTokenKey), CustomClaims{
-		Purpose: jwtpurpose.JWTRefresh,
+	refreshToken, err := createJWT([]byte(cfg.RefreshTokenKey), CustomClaims{
+		Purpose: jwtpurpose.Refresh,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.JWT.RefreshTokenExpiresIn)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.RefreshTokenExpiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	})
@@ -73,10 +74,8 @@ func GenerateAcAndRtTokens(config *config.Config, userID uuid.UUID) (string, str
 	return accessToken, refreshToken, nil
 }
 
-func GenerateEmailToken(
-	config *config.Config, email string,
-	secret []byte, expiresIn time.Duration, purpose jwtpurpose.JWTPurpose,
-) (string, error) {
+// Generate email token
+func GenerateEmailToken(secret []byte, expiresIn time.Duration, email string, purpose jwtpurpose.JWTPurpose) (string, error) {
 	emailVerifyToken, err := createJWT(
 		secret,
 		CustomClaims{

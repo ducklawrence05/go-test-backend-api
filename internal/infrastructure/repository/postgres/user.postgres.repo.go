@@ -20,27 +20,35 @@ func NewUserRepo(db *gorm.DB) repository.UserRepository {
 
 func (r *userPgRepo) GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
 	var user entities.User
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Unscoped().
 		Preload("Role").
 		Where("id = ?", id).
-		Where("is_active = ?", true).
 		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
+
+	if user.DeletedAt.Valid {
+		return nil, errorcode.ErrDeletedAccount
+	}
+
 	return &user, nil
 }
 
-func (r *userPgRepo) GetActiveByIdentity(ctx context.Context, identity string) (*entities.User, error) {
+func (r *userPgRepo) GetByUserNameOrEmail(ctx context.Context, identity string) (*entities.User, error) {
 	var user entities.User
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Unscoped().
 		Preload("Role").
 		Where("user_name = ? OR email = ?", identity, identity).
-		Where("is_active = ?", true).
 		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
+
+	if user.DeletedAt.Valid {
+		return &user, errorcode.ErrDeletedAccount
+	}
+
 	return &user, nil
 }
 
@@ -81,7 +89,7 @@ func (r *userPgRepo) IsEmailTaken(ctx context.Context, email string, excludeUser
 }
 
 func (r *userPgRepo) Update(ctx context.Context, user *entities.User, fields map[string]any) error {
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Unscoped().
 		Model(&user).
 		Updates(fields).Error
 	if err != nil {

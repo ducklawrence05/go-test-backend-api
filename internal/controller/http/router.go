@@ -3,7 +3,6 @@ package http
 import (
 	"github.com/ducklawrence05/go-test-backend-api/config"
 	"github.com/ducklawrence05/go-test-backend-api/internal/controller/http/v1/router"
-	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/user"
 	"github.com/ducklawrence05/go-test-backend-api/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -19,9 +18,7 @@ type RouterConfig struct {
 
 func InitRouter(
 	routerCfg *RouterConfig,
-	uRegistration user.UserRegistrationManager,
-	uAuth user.UserAuthManager,
-	uProfile user.UserProfileManager,
+	userManagerSet *router.UserManagerSet,
 ) *gin.Engine {
 	var r *gin.Engine
 
@@ -39,11 +36,9 @@ func InitRouter(
 		router.InitUserRouter(MainGroup,
 			&router.UserRouterConfig{
 				Config: routerCfg.Config,
-				Db:     routerCfg.Db,
-				Rdb:    routerCfg.Rdb,
 				Logger: routerCfg.Logger,
 			},
-			uRegistration, uAuth, uProfile,
+			userManagerSet,
 		)
 	}
 

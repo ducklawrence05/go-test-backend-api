@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func AccessTokenMiddleware(secret []byte, logger logger.Interface, purpose jwtpurpose.JWTPurpose) gin.HandlerFunc {
+func ValidateToken(secret []byte, logger logger.Interface, purpose jwtpurpose.JWTPurpose) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// get token from header
 		authHeader := c.GetHeader("Authorization")
@@ -39,7 +39,7 @@ func AccessTokenMiddleware(secret []byte, logger logger.Interface, purpose jwtpu
 		}
 
 		switch claims.Purpose {
-		case jwtpurpose.JWTAccess, jwtpurpose.JWTRefresh:
+		case jwtpurpose.Access, jwtpurpose.Refresh:
 			userID, err := uuid.Parse(claims.Subject)
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
@@ -47,7 +47,7 @@ func AccessTokenMiddleware(secret []byte, logger logger.Interface, purpose jwtpu
 				})
 			}
 			c.Set("userID", userID)
-		case jwtpurpose.JWTRegister, jwtpurpose.JWTRestore:
+		case jwtpurpose.Register, jwtpurpose.Restore:
 			c.Set("email", claims.Subject)
 		}
 

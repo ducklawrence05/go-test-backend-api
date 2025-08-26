@@ -11,6 +11,7 @@ type CreateUserVO struct {
 }
 
 type RestoreUserVO struct {
+	Email       string
 	NewPassword string
 }
 

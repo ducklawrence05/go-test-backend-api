@@ -9,6 +9,7 @@ import (
 	"github.com/ducklawrence05/go-test-backend-api/internal/constants/errorcode"
 	"github.com/ducklawrence05/go-test-backend-api/internal/constants/jwtpurpose"
 	"github.com/ducklawrence05/go-test-backend-api/internal/constants/otptype"
+	"github.com/ducklawrence05/go-test-backend-api/internal/constants/rolecache"
 	"github.com/ducklawrence05/go-test-backend-api/internal/entities"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/repository"
 	"github.com/ducklawrence05/go-test-backend-api/internal/usecase/uow"
@@ -32,7 +33,6 @@ type userRegistrationManager struct {
 	uow              uow.UserManagerUow
 	otpRepo          repository.OTPRepository
 	userRepo         repository.UserRepository
-	roleRepo         repository.RoleRepository
 	refreshTokenRepo repository.RefreshTokenRepository
 }
 
@@ -42,7 +42,6 @@ func NewUserRegistrationManager(
 	uow uow.UserManagerUow,
 	otpRepo repository.OTPRepository,
 	userRepo repository.UserRepository,
-	roleRepo repository.RoleRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
 ) user.UserRegistrationManager {
 	return &userRegistrationManager{
@@ -51,7 +50,6 @@ func NewUserRegistrationManager(
 		logger:           logger,
 		otpRepo:          otpRepo,
 		userRepo:         userRepo,
-		roleRepo:         roleRepo,
 		refreshTokenRepo: refreshTokenRepo,
 	}
 }
@@ -71,7 +69,7 @@ func (m *userRegistrationManager) SendRegistrationOTP(ctx context.Context, email
 	// hash email
 	hashedEmail := str.HashString(email, []byte(m.config.OTP.RegisterKey))
 	// save otp to redis
-	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.OTPRegister,
+	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.Register,
 		m.config.OTP.RegisterExpiresIn); err != nil {
 		return err
 	}
@@ -93,7 +91,7 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	hashedEmail := str.HashString(email, []byte(m.config.OTP.RegisterKey))
 
 	// check otp in redis
-	storedOtp, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.OTPRegister)
+	storedOtp, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.Register)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return "", errorcode.ErrOTPNotFound
@@ -105,13 +103,15 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	}
 
 	// delete otp in redis
-	if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.OTPRegister); err != nil {
-		m.logger.Warn("Cannot delete old otp from Redis", zap.Error(err))
-	}
+	go func() {
+		if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.Register); err != nil {
+			m.logger.Warn("Cannot delete old otp from Redis", zap.Error(err))
+		}
+	}()
 
 	// gene jwt token
-	token, err := jwt.GenerateEmailToken(m.config, email,
-		[]byte(m.config.JWT.RefreshTokenKey), m.config.JWT.RefreshTokenExpiresIn, jwtpurpose.JWTRegister)
+	token, err := jwt.GenerateEmailToken([]byte(m.config.JWT.RegisterTokenKey), m.config.JWT.RegisterTokenExpiresIn,
+		email, jwtpurpose.Register)
 	if err != nil {
 		return "", err
 	}
@@ -119,10 +119,9 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	return token, nil
 }
 
-func (m *userRegistrationManager) CompleteRegistration(ctx context.Context, vo user.CreateUserVO) (string, string, error) {
+func (m *userRegistrationManager) Register(ctx context.Context, vo user.CreateUserVO) (string, string, error) {
 	g, gCtx := errgroup.WithContext(ctx)
 
-	drChan := make(chan *entities.Role, 1)
 	hpChan := make(chan string, 1)
 
 	// check if username exists
@@ -149,16 +148,6 @@ func (m *userRegistrationManager) CompleteRegistration(ctx context.Context, vo u
 		return nil
 	})
 
-	// get default role
-	g.Go(func() error {
-		dr, err := m.roleRepo.GetByName(gCtx, "user")
-		if err != nil {
-			return err
-		}
-		drChan <- dr
-		return nil
-	})
-
 	// hash pass
 	g.Go(func() error {
 		hp, err := password.HashPassword(vo.Password)
@@ -173,6 +162,12 @@ func (m *userRegistrationManager) CompleteRegistration(ctx context.Context, vo u
 		return "", "", err
 	}
 
+	// get user role id
+	defaultRole, ok := rolecache.Get("user")
+	if !ok {
+		return "", "", errorcode.ErrUnexpectedCreatingUser
+	}
+
 	// create use
 	userID := uuid.New()
 	user := &entities.User{
@@ -184,7 +179,7 @@ func (m *userRegistrationManager) CompleteRegistration(ctx context.Context, vo u
 		Password:  <-hpChan,
 		IsActive:  true,
 
-		RoleID: (<-drChan).ID,
+		RoleID: defaultRole.ID,
 	}
 
 	var accessToken, refreshToken string
@@ -197,18 +192,19 @@ func (m *userRegistrationManager) CompleteRegistration(ctx context.Context, vo u
 		}
 
 		// gene ac and rt
-		accessToken, refreshToken, err = jwt.GenerateAcAndRtTokens(m.config, user.ID)
+		accessToken, refreshToken, err = jwt.GenerateAcAndRtTokens(&m.config.JWT, user.ID)
 		if err != nil {
 			return err
 		}
 
 		// decode rt to get exp and iat
 		claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
-			refreshToken, jwtpurpose.JWTRefresh)
+			refreshToken, jwtpurpose.Refresh)
 		if err != nil {
 			return err
 		}
 
+		// insert rt to db
 		if err := r.RefreshTokenRepository().Create(ctx, &entities.RefreshToken{
 			ID:        uuid.New(),
 			UserID:    user.ID,

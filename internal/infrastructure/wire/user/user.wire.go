@@ -37,7 +37,6 @@ func InitUserRegistrationManager(
 	wire.Build(
 		rdRepo.NewOtpRepo,
 		postgres.NewUserRepo,
-		postgres.NewRoleRepo,
 		postgres.NewRefreshTokenRepo,
 		postgres.NewUserManagerUow,
 		userImpl.NewUserRegistrationManager,
@@ -53,6 +52,22 @@ func InitUserProfileManager(
 		postgres.NewUserRepo,
 		postgres.NewUserManagerUow,
 		userImpl.NewUserProfileManager,
+	)
+	return nil
+}
+
+func InitUserRestoreManager(
+	config *config.Config,
+	db *gorm.DB,
+	rdb *redis.Client,
+	l logger.Interface,
+) userInterface.UserRestoreManager {
+	wire.Build(
+		rdRepo.NewOtpRepo,
+		postgres.NewUserRepo,
+		postgres.NewRefreshTokenRepo,
+		postgres.NewUserManagerUow,
+		userImpl.NewUserRestoreManager,
 	)
 	return nil
 }

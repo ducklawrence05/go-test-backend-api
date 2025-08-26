@@ -40,20 +40,24 @@ func NewUserAuthManager(
 
 func (m *userAuthManager) Login(ctx context.Context, vo user.LoginUserVO) (string, string, error) {
 	// get user from db
-	user, err := m.userRepo.GetActiveByIdentity(ctx, vo.EmailOrUsername)
-	if err != nil || !password.ComparePasswords(user.Password, []byte(vo.Password)) {
+	user, err := m.userRepo.GetByUserNameOrEmail(ctx, vo.EmailOrUsername)
+	if err != nil {
+		return "", "", err
+	}
+
+	if !password.ComparePasswords(user.Password, []byte(vo.Password)) {
 		return "", "", errorcode.ErrInvalidPassword
 	}
 
 	// gene ac and rt
-	accessToken, refreshToken, err := jwt.GenerateAcAndRtTokens(m.config, user.ID)
+	accessToken, refreshToken, err := jwt.GenerateAcAndRtTokens(&m.config.JWT, user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
 	// decode rt to get exp and iat
 	claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
-		refreshToken, jwtpurpose.JWTRefresh)
+		refreshToken, jwtpurpose.Refresh)
 	if err != nil {
 		return "", "", err
 	}
@@ -78,7 +82,7 @@ func (m *userAuthManager) Login(ctx context.Context, vo user.LoginUserVO) (strin
 func (m *userAuthManager) Logout(ctx context.Context, vo user.LogoutUserVO) error {
 	// decode rt
 	claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
-		vo.RefreshToken, jwtpurpose.JWTRefresh)
+		vo.RefreshToken, jwtpurpose.Refresh)
 	if err != nil {
 		return err
 	}
@@ -107,7 +111,7 @@ func (m *userAuthManager) RefreshToken(ctx context.Context, refreshToken string)
 	err := m.uow.Do(ctx, func(r uow.UserManagerRepoProvider) error {
 		// validate token
 		claims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
-			refreshToken, jwtpurpose.JWTRefresh)
+			refreshToken, jwtpurpose.Refresh)
 		if err != nil {
 			return errorcode.ErrInvalidToken
 		}
@@ -126,14 +130,14 @@ func (m *userAuthManager) RefreshToken(ctx context.Context, refreshToken string)
 		}
 
 		// gene ac and rt
-		accessToken, newRefreshToken, err = jwt.GenerateAcAndRtTokens(m.config, userID)
+		accessToken, newRefreshToken, err = jwt.GenerateAcAndRtTokens(&m.config.JWT, userID)
 		if err != nil {
 			return err
 		}
 
 		// decode rt to get exp and iat
 		newClaims, err := jwt.ValidateToken([]byte(m.config.JWT.RefreshTokenKey),
-			newRefreshToken, jwtpurpose.JWTRefresh)
+			newRefreshToken, jwtpurpose.Refresh)
 		if err != nil {
 			return err
 		}
