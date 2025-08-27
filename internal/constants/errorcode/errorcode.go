@@ -9,7 +9,8 @@ import (
 
 var (
 	// 400
-	ErrInvalidEmail    = errors.New("this email is already exists")
+	ErrExistedEmail    = errors.New("this email is already exists")
+	ErrRequiredEmail   = errors.New("email is required")
 	ErrInvalidUserName = errors.New("this username is already exists")
 	ErrInvalidPassword = errors.New("invalid password")
 	ErrInvalidOTP      = errors.New("invalid otp")
@@ -41,7 +42,8 @@ var (
 // Map code -> http code
 var errorStatusMap = map[error]int{
 	// 400
-	ErrInvalidEmail:    http.StatusBadRequest,
+	ErrExistedEmail:    http.StatusBadRequest,
+	ErrRequiredEmail:   http.StatusBadRequest,
 	ErrInvalidUserName: http.StatusBadRequest,
 	ErrInvalidPassword: http.StatusBadRequest,
 	ErrInvalidOTP:      http.StatusBadRequest,

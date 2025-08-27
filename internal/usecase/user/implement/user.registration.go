@@ -59,13 +59,32 @@ func (m *userRegistrationManager) SendRegistrationOTP(ctx context.Context, email
 		return err
 	}
 	if exists {
-		return errorcode.ErrInvalidEmail
+		return errorcode.ErrExistedEmail
 	}
 
 	// gene otp
 	otp := otputils.GenerateSecureOTP()
 	// hash email
 	hashedEmail := str.HashString(email, []byte(m.config.OTP.RegisterKey))
+	// check rate limit
+	count, err := m.otpRepo.CountRateLimit(ctx, hashedEmail, otptype.Register,
+		m.config.OTP.RegisterRateLimitTTL)
+	if err != nil {
+		return err
+	}
+	if count > int64(m.config.OTP.RegisterRateLimit) {
+		return errorcode.ErrOTPRateLimit
+	}
+
+	// check old otp if exists then delete
+	if _, err := m.otpRepo.GetOTP(ctx, hashedEmail, otptype.Register); err == nil {
+		go func() {
+			if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.Register); err != nil {
+				m.logger.Warn("Cannot delete old otp", zap.Error(err))
+			}
+		}()
+	}
+
 	// save otp to redis
 	if err := m.otpRepo.SetOTP(ctx, hashedEmail, otp, otptype.Register,
 		m.config.OTP.RegisterTTL); err != nil {
@@ -93,16 +112,34 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	if err != nil {
 		return "", err
 	}
+	checkExceedAttempts := false
 	if storedOtp != otp {
-		return "", errorcode.ErrInvalidOTP
+		// incr attempt
+		attempts, err := m.otpRepo.IncrementAttempt(ctx, hashedEmail, otptype.Register,
+			m.config.OTP.RegisterAttemptsTTL)
+		if err != nil {
+			return "", err
+		}
+
+		if attempts <= int64(m.config.OTP.RegisterAttempts) {
+			return "", errorcode.ErrInvalidOTP
+		}
+		checkExceedAttempts = true
 	}
 
 	// delete otp in redis
 	go func() {
 		if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.Register); err != nil {
-			m.logger.Warn("Cannot delete old otp from Redis", zap.Error(err))
+			m.logger.Warn("Cannot delete old otp", zap.Error(err))
+		}
+		if err := m.otpRepo.ResetAttempt(ctx, hashedEmail, otptype.Register); err != nil {
+			m.logger.Warn("Cannot reset attempt old otp", zap.Error(err))
 		}
 	}()
+
+	if checkExceedAttempts {
+		return "", errorcode.ErrOTPTooManyAttempts
+	}
 
 	// gene jwt token
 	token, err := jwt.GenerateEmailToken([]byte(m.config.JWT.RegisterTokenKey), m.config.JWT.RegisterTokenExpiresIn,
@@ -138,7 +175,7 @@ func (m *userRegistrationManager) Register(ctx context.Context, vo user.CreateUs
 			return err
 		}
 		if exists {
-			return errorcode.ErrInvalidEmail
+			return errorcode.ErrExistedEmail
 		}
 		return nil
 	})

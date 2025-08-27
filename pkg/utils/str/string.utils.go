@@ -4,22 +4,33 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"unicode"
 )
 
+// pascal case / camel case -> snake case
 func ToSnakeCase(s string) string {
 	if s == "" {
 		return s
 	}
-	var result []rune
-	for i, r := range s {
-		if i > 0 && unicode.IsUpper(r) {
-			result = append(result, '_')
+
+	var b strings.Builder
+	runes := []rune(s)
+	n := len(runes)
+
+	for i := range n {
+		b.WriteRune(unicode.ToLower(runes[i]))
+
+		nextIsUpper := i+1 < n && unicode.IsUpper(runes[i+1])
+		overIsLowerOrNil := (i+2 >= n && unicode.IsLower(runes[i])) ||
+			(i+2 < n && unicode.IsLower(runes[i+2]))
+		if nextIsUpper && overIsLowerOrNil {
+			b.WriteRune('_')
 		}
-		result = append(result, unicode.ToLower(r))
+
 	}
 
-	return string(result)
+	return b.String()
 }
 
 func HashString(str string, secret []byte) string {
