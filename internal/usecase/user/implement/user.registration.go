@@ -128,14 +128,12 @@ func (m *userRegistrationManager) VerifyRegistrationOTP(ctx context.Context, ema
 	}
 
 	// delete otp in redis
-	go func() {
-		if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.Register); err != nil {
-			m.logger.Warn("Cannot delete old otp", zap.Error(err))
-		}
-		if err := m.otpRepo.ResetAttempt(ctx, hashedEmail, otptype.Register); err != nil {
-			m.logger.Warn("Cannot reset attempt old otp", zap.Error(err))
-		}
-	}()
+	if err := m.otpRepo.DeleteOTP(ctx, hashedEmail, otptype.Register); err != nil {
+		m.logger.Warn("Cannot delete old otp", zap.Error(err))
+	}
+	if err := m.otpRepo.ResetAttempt(ctx, hashedEmail, otptype.Register); err != nil {
+		m.logger.Warn("Cannot reset attempt old otp", zap.Error(err))
+	}
 
 	if checkExceedAttempts {
 		return "", errorcode.ErrOTPTooManyAttempts
